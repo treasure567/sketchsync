@@ -1,0 +1,15 @@
+{
+  "name": "sketchsync",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Real-time collaborative whiteboard",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @sketchsync/web dev",
+    "build": "pnpm --filter @sketchsync/web build",
+    "lint": "pnpm -r lint",
+    "preview": "pnpm --filter @sketchsync/web preview"
+  }
+}
