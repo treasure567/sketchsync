@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import { CircleAlert, Clock, Copy, Info, Link2, Lock, Mail, Radio, Share2, TriangleAlert, UserCog, Users, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Dialog } from '@/components/ui/Dialog'
-import type { BoardMeta, ShareRole, ShareSettings } from '@/lib/boards/store'
+import { newShareToken, type BoardMeta, type ShareRole, type ShareSettings } from '@/lib/boards/store'
 
 const HOUR = 60 * 60 * 1000
 const expiryOptions = [
@@ -166,7 +166,7 @@ export function ShareDialog({ board, onChange, onClose }: ShareDialogProps) {
               Nobody can open this board with the old link.
               <button
                 type="button"
-                onClick={() => update({ enabled: true, token: Math.random().toString(36).slice(2, 8), expiresAt: Date.now() + 24 * HOUR })}
+                onClick={() => update({ enabled: true, token: newShareToken(), expiresAt: Date.now() + 24 * HOUR })}
                 className="h-8 shrink-0 rounded-lg bg-brand-500 px-3 font-semibold text-white hover:bg-brand-600"
               >
                 Create new link

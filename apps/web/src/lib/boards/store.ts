@@ -43,12 +43,14 @@ export const FREE_BOARD_LIMIT = 10
 const listeners = new Set<() => void>()
 let cache: BoardMeta[] | null = null
 
-function newToken() {
-  return Math.random().toString(36).slice(2, 8)
+/** Unguessable share-link token: 128 random bits as hex. */
+export function newShareToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 export function defaultShareSettings(): ShareSettings {
-  return { token: newToken(), enabled: true, role: 'edit', expiresAt: Date.now() + 24 * 60 * 60 * 1000, requireSignIn: true, invites: [] }
+  return { token: newShareToken(), enabled: true, role: 'edit', expiresAt: Date.now() + 24 * 60 * 60 * 1000, requireSignIn: true, invites: [] }
 }
 
 function readIndex(): BoardMeta[] {
@@ -98,6 +100,15 @@ export function listBoards(): BoardMeta[] {
   return boards
 }
 
+/**
+ * The index as currently stored, for read-modify-write changes, so a change
+ * made in another tab since this one last read it is never overwritten.
+ */
+function latestBoards() {
+  cache = null
+  return listBoards()
+}
+
 export function subscribeBoards(listener: () => void) {
   listeners.add(listener)
   const onStorage = (event: StorageEvent) => {
@@ -124,17 +135,17 @@ function newMeta(name: string, type: BoardType, elementCount: number): BoardMeta
 export function createBoard({ name = 'Untitled Board', type = 'whiteboard', elements = [] }: { name?: string; type?: BoardType; elements?: BoardElement[] } = {}) {
   const meta = newMeta(name, type, elements.length)
   saveBoardElements(meta.id, elements, { touch: false })
-  writeIndex([meta, ...listBoards()])
+  writeIndex([meta, ...latestBoards()])
   return meta
 }
 
 export function updateBoard(id: string, patch: Partial<Omit<BoardMeta, 'id'>>) {
-  writeIndex(listBoards().map((board) => (board.id === id ? { ...board, ...patch } : board)))
+  writeIndex(latestBoards().map((board) => (board.id === id ? { ...board, ...patch } : board)))
 }
 
 export function deleteBoardForever(id: string) {
   localStorage.removeItem(contentKey(id))
-  writeIndex(listBoards().filter((board) => board.id !== id))
+  writeIndex(latestBoards().filter((board) => board.id !== id))
 }
 
 export function loadBoardElements(id: string): BoardElement[] {
