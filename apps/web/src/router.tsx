@@ -1,4 +1,5 @@
 import { createBrowserRouter } from 'react-router'
+import { BoardPage } from '@/pages/BoardPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { LandingPage } from '@/pages/LandingPage'
 import { SignInPage } from '@/pages/SignInPage'
@@ -20,5 +21,9 @@ export const router = createBrowserRouter([
   {
     path: '/dashboard',
     element: <DashboardPage />,
+  },
+  {
+    path: '/board',
+    element: <BoardPage />,
   },
 ])
