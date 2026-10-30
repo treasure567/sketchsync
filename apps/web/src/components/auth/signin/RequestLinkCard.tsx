@@ -5,12 +5,14 @@ import { primaryButton } from '@/components/auth/buttonStyles'
 import { EmailField } from '@/components/auth/EmailField'
 
 type RequestLinkCardProps = {
+  /** Sign in with Google, GitHub or Facebook. */
+  onProvider: () => void
   email: string
   onEmailChange: (email: string) => void
   onSubmit: () => void
 }
 
-export function RequestLinkCard({ email, onEmailChange, onSubmit }: RequestLinkCardProps) {
+export function RequestLinkCard({ onProvider, email, onEmailChange, onSubmit }: RequestLinkCardProps) {
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
     onSubmit()
@@ -22,9 +24,9 @@ export function RequestLinkCard({ email, onEmailChange, onSubmit }: RequestLinkC
       <p className="mt-5 text-sm text-ink-muted">Sign in to resume sketching and collaborate.</p>
 
       <div className="mt-5 space-y-3">
-        <ProviderButton provider="Google" />
-        <ProviderButton provider="GitHub" />
-        <ProviderButton provider="Facebook" />
+        <ProviderButton provider="Google" onClick={onProvider} />
+        <ProviderButton provider="GitHub" onClick={onProvider} />
+        <ProviderButton provider="Facebook" onClick={onProvider} />
       </div>
 
       <OrDivider>or continue with email</OrDivider>

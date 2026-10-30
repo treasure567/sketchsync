@@ -69,12 +69,13 @@ type ProviderButtonProps = {
   provider: Provider
   /** Show just the provider name, for side-by-side buttons. */
   compact?: boolean
+  onClick?: () => void
 }
 
-export function ProviderButton({ provider, compact = false }: ProviderButtonProps) {
+export function ProviderButton({ provider, compact = false, onClick }: ProviderButtonProps) {
   const Icon = providerIcons[provider]
   return (
-    <button type="button" className={outlineButton}>
+    <button type="button" onClick={onClick} className={outlineButton}>
       <Icon className="size-[18px]" />
       {compact ? provider : `Continue with ${provider}`}
     </button>

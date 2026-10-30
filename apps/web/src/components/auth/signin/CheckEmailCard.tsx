@@ -5,6 +5,18 @@ import { primaryButton, secondaryButton } from '@/components/auth/buttonStyles'
 
 const RESEND_COOLDOWN_SECONDS = 30
 
+const webmail: [RegExp, string][] = [
+  [/@(gmail|googlemail).com$/, 'https://mail.google.com'],
+  [/@(outlook|hotmail|live|msn)./, 'https://outlook.live.com/mail'],
+  [/@(yahoo|ymail)./, 'https://mail.yahoo.com'],
+  [/@(icloud|me|mac).com$/, 'https://www.icloud.com/mail'],
+]
+
+/** The webmail inbox for well-known providers, otherwise the default mail app. */
+function inboxUrl(email: string) {
+  return webmail.find(([pattern]) => pattern.test(email.toLowerCase()))?.[1] ?? 'mailto:'
+}
+
 type CheckEmailCardProps = {
   email: string
   onUseAnotherAddress: () => void
@@ -40,10 +52,10 @@ export function CheckEmailCard({ email, onUseAnotherAddress }: CheckEmailCardPro
       <p className="mx-auto mt-3 max-w-xs text-xs text-ink-muted">Click the link in your email to sign in automatically. No password required.</p>
 
       <div className="mt-6 space-y-3">
-        <button type="button" className={primaryButton}>
+        <a href={inboxUrl(email)} target="_blank" rel="noreferrer" className={primaryButton}>
           <SquareArrowOutUpRight className="size-[18px]" />
           Open email app
-        </button>
+        </a>
         <button type="button" className={secondaryButton} disabled={secondsLeft > 0} onClick={resend}>
           <Timer className="size-4" />
           {secondsLeft > 0 ? `Resend in ${secondsLeft}s` : 'Resend magic link'}

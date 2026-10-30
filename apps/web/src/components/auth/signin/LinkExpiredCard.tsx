@@ -15,13 +15,15 @@ function BulbDoodle() {
 }
 
 type LinkExpiredCardProps = {
+  /** Sign in with Google, GitHub or Facebook. */
+  onProvider: () => void
   email: string
   onEmailChange: (email: string) => void
   onRequestNewLink: () => void
   onReturnToLogin: () => void
 }
 
-export function LinkExpiredCard({ email, onEmailChange, onRequestNewLink, onReturnToLogin }: LinkExpiredCardProps) {
+export function LinkExpiredCard({ onProvider, email, onEmailChange, onRequestNewLink, onReturnToLogin }: LinkExpiredCardProps) {
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
     onRequestNewLink()
@@ -62,8 +64,8 @@ export function LinkExpiredCard({ email, onEmailChange, onRequestNewLink, onRetu
       <OrDivider>or sign in with</OrDivider>
 
       <div className="grid grid-cols-2 gap-3">
-        <ProviderButton provider="Google" compact />
-        <ProviderButton provider="GitHub" compact />
+        <ProviderButton provider="Google" compact onClick={onProvider} />
+        <ProviderButton provider="GitHub" compact onClick={onProvider} />
       </div>
 
       <button
