@@ -12,7 +12,8 @@ export function downloadBlob(blob: Blob, filename: string) {
   link.href = url
   link.download = filename
   link.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  // Keep the URL alive long enough for slow downloads to start before releasing it.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
 function exportBounds(elements: BoardElement[]): Bounds {
