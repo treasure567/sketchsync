@@ -1,16 +1,38 @@
 import { useEffect, useState } from 'react'
-import type { BoardFilter } from '@/components/dashboard/boardFilters'
+import { useSearchParams } from 'react-router'
+import { BoardGrid } from '@/components/dashboard/BoardGrid'
+import { boardFilters, type BoardFilter } from '@/components/dashboard/boardFilters'
 import { EmptyBoards } from '@/components/dashboard/EmptyBoards'
+import { type Board, sampleBoards } from '@/components/dashboard/sampleBoards'
 import { Sidebar } from '@/components/dashboard/Sidebar'
+import { TemplateGallery } from '@/components/dashboard/TemplateGallery'
 import { TemplateStrip } from '@/components/dashboard/TemplateStrip'
 import { TopBar, type BoardView } from '@/components/dashboard/TopBar'
 
+function applyFilter(boards: Board[], filter: BoardFilter) {
+  switch (filter) {
+    case 'mine':
+      return boards.filter((board) => board.role === 'owner')
+    case 'shared':
+      return boards.filter((board) => board.role !== 'owner')
+    case 'starred':
+      return boards.filter((board) => board.starred)
+    case 'trash':
+      return []
+    default:
+      return boards
+  }
+}
+
 /*
- * Boards are not loaded from anywhere yet, so the dashboard always shows its
- * empty state.
+ * Boards are not loaded from a server yet: the dashboard shows sample boards,
+ * or its empty state when opened as /dashboard?empty.
  */
 export function DashboardPage() {
+  const [searchParams] = useSearchParams()
+  const boards = searchParams.has('empty') ? [] : sampleBoards
   const [filter, setFilter] = useState<BoardFilter>('all')
+  const filterLabel = boardFilters.find(({ id }) => id === filter)?.label ?? 'All boards'
   const [view, setView] = useState<BoardView>('grid')
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -49,10 +71,19 @@ export function DashboardPage() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar view={view} onViewChange={setView} onOpenMenu={() => setMenuOpen(true)} />
         <main className="flex-1 space-y-8 px-4 py-6 sm:px-6 lg:px-8">
-          <TemplateStrip />
-          <div className="mx-auto max-w-4xl">
-            <EmptyBoards />
-          </div>
+          {boards.length === 0 ? (
+            <>
+              <TemplateStrip />
+              <div className="mx-auto max-w-4xl">
+                <EmptyBoards />
+              </div>
+            </>
+          ) : (
+            <>
+              <TemplateGallery />
+              <BoardGrid key={filter} title={filterLabel} boards={applyFilter(boards, filter)} />
+            </>
+          )}
         </main>
       </div>
     </div>
