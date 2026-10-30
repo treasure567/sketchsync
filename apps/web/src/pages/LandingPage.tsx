@@ -3,6 +3,7 @@ import { Features } from '@/components/landing/Features'
 import { Hero } from '@/components/landing/Hero'
 import { Navbar } from '@/components/landing/Navbar'
 import { Offline } from '@/components/landing/Offline'
+import { QuickSketch } from '@/components/landing/QuickSketch'
 
 export function LandingPage() {
   return (
@@ -13,6 +14,7 @@ export function LandingPage() {
         <Features />
         <Collaboration />
         <Offline />
+        <QuickSketch />
       </main>
     </>
   )
