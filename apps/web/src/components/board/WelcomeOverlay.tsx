@@ -6,6 +6,8 @@ import { Kbd } from '@/components/ui/Kbd'
 type WelcomeOverlayProps = {
   onOpenFile: () => void
   onDropSticky: () => void
+  onStartSession: () => void
+  onShowShortcuts: () => void
 }
 
 type MenuItemProps = {
@@ -34,7 +36,7 @@ function MenuItem({ icon, label, description, trailing, onClick }: MenuItemProps
 }
 
 /** Shown on an empty board: a hint, a quick-start menu and an example sticky note. */
-export function WelcomeOverlay({ onOpenFile, onDropSticky }: WelcomeOverlayProps) {
+export function WelcomeOverlay({ onOpenFile, onDropSticky, onStartSession, onShowShortcuts }: WelcomeOverlayProps) {
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
       <div
@@ -64,6 +66,7 @@ export function WelcomeOverlay({ onOpenFile, onDropSticky }: WelcomeOverlayProps
             icon={<Radio className="size-4 text-accent-teal" />}
             label="Live collaboration session"
             description="Invite squad with live cursor tracking"
+            onClick={onStartSession}
             trailing={
               <span className="flex -space-x-1" aria-hidden="true">
                 <span className="grid size-5 place-items-center rounded-full bg-accent-teal-soft text-[8px] font-bold text-accent-teal ring-2 ring-surface">M</span>
@@ -73,7 +76,7 @@ export function WelcomeOverlay({ onOpenFile, onDropSticky }: WelcomeOverlayProps
             }
           />
           <MenuItem icon={<StickyNote className="size-4 text-accent-orange" />} label="Drop a sticky note" trailing={<Kbd>N</Kbd>} onClick={onDropSticky} />
-          <MenuItem icon={<CircleHelp className="size-4" />} label="Keyboard shortcuts & Help" trailing={<Kbd>?</Kbd>} />
+          <MenuItem icon={<CircleHelp className="size-4" />} label="Keyboard shortcuts & Help" trailing={<Kbd>?</Kbd>} onClick={onShowShortcuts} />
         </ul>
       </div>
     </div>

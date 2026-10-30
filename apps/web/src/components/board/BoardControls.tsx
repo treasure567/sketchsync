@@ -1,4 +1,5 @@
-import { Hand, Minus, Plus, Redo2, Undo2 } from 'lucide-react'
+import clsx from 'clsx'
+import { CircleHelp, Hand, Map as MapIcon, Minus, Plus, Redo2, ShieldCheck, Undo2 } from 'lucide-react'
 import { Kbd } from '@/components/ui/Kbd'
 
 const group = 'pointer-events-auto flex items-center rounded-lg bg-surface shadow-sm ring-1 ring-line'
@@ -48,11 +49,47 @@ export function BoardControls({ zoom, onZoomIn, onZoomOut, onResetZoom, canUndo,
   )
 }
 
-export function CanvasHint() {
+type BoardStatusProps = {
+  minimapOpen: boolean
+  onToggleMinimap: () => void
+  onHelp: () => void
+}
+
+/** Offline-save notice, minimap toggle and help for the bottom-right corner. */
+export function BoardStatus({ minimapOpen, onToggleMinimap, onHelp }: BoardStatusProps) {
+  return (
+    <div className="pointer-events-auto flex items-center gap-2">
+      <span className="flex h-8 items-center gap-1.5 rounded-full bg-surface px-3 text-[11px] text-ink-muted shadow-sm ring-1 ring-line max-sm:hidden">
+        <ShieldCheck className="size-3.5 text-accent-green" aria-hidden="true" />
+        All changes saved offline
+      </span>
+      <button
+        type="button"
+        aria-label={minimapOpen ? 'Hide minimap' : 'Show minimap'}
+        title="Minimap"
+        aria-pressed={minimapOpen}
+        onClick={onToggleMinimap}
+        className={clsx('grid size-8 place-items-center rounded-full bg-surface shadow-sm ring-1 ring-line hover:bg-brand-50', minimapOpen ? 'text-brand-600' : 'text-ink')}
+      >
+        <MapIcon className="size-4" />
+      </button>
+      <button type="button" aria-label="Keyboard shortcuts and help" title="Shortcuts & help — ?" onClick={onHelp} className="grid size-8 place-items-center rounded-full bg-surface text-ink shadow-sm ring-1 ring-line hover:bg-brand-50">
+        <CircleHelp className="size-4" />
+      </button>
+    </div>
+  )
+}
+
+/** Hint under the toolbar; the default one explains panning. */
+export function CanvasHint({ hint }: { hint?: string }) {
   return (
     <p className="flex items-center gap-1.5 rounded-full bg-surface/80 px-3 py-1 text-[11px] text-ink-muted backdrop-blur">
       <Hand className="size-3.5" aria-hidden="true" />
-      To move canvas, hold <Kbd>Space</Kbd> while dragging, or select Hand
+      {hint ?? (
+        <>
+          To move canvas, hold <Kbd>Space</Kbd> while dragging, or select Hand
+        </>
+      )}
     </p>
   )
 }
