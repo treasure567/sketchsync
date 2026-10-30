@@ -23,7 +23,7 @@ export function Navbar({ authLink = 'signup' }: NavbarProps) {
           <ButtonLink to={to} variant="ghost" className="max-sm:hidden">
             {label}
           </ButtonLink>
-          <ButtonLink to="/board">Open whiteboard</ButtonLink>
+          <ButtonLink to="/dashboard">Open whiteboard</ButtonLink>
         </div>
       </nav>
     </header>
