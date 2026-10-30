@@ -1,26 +1,17 @@
-import { createBrowserRouter, Navigate, Outlet, ScrollRestoration } from 'react-router'
+import { createBrowserRouter, Navigate } from 'react-router'
 import { ErrorPage } from '@/components/layout/ErrorPage'
 import { NotFoundPage } from '@/components/layout/MessagePage'
 import { PageLoading } from '@/components/layout/PageLoading'
+import { RootLayout } from '@/components/layout/RootLayout'
 import { LandingPage } from '@/pages/LandingPage'
 
 /*
  * The landing page ships in the main bundle; every other page loads on
  * demand, so first visits on slow connections download as little as possible.
  */
-/** Scrolls to the top on navigation, or to #anchors such as /help#shortcuts. */
-function Root() {
-  return (
-    <>
-      <ScrollRestoration />
-      <Outlet />
-    </>
-  )
-}
-
 export const router = createBrowserRouter([
   {
-    element: <Root />,
+    element: <RootLayout />,
     HydrateFallback: PageLoading,
     errorElement: <ErrorPage />,
     children: [
