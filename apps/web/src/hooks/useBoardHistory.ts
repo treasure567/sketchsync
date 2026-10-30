@@ -18,6 +18,7 @@ type Action =
   | { type: 'begin' }
   | { type: 'update'; updater: Updater }
   | { type: 'commit' }
+  | { type: 'cancel' }
   | { type: 'apply'; updater: Updater }
   | { type: 'undo' }
   | { type: 'redo' }
@@ -36,6 +37,8 @@ function reducer(state: State, action: Action): State {
     case 'commit':
       if (!state.checkpoint || state.checkpoint === state.present) return { ...state, checkpoint: null }
       return { past: pushPast(state.past, state.checkpoint), present: state.present, future: [], checkpoint: null }
+    case 'cancel':
+      return state.checkpoint ? { ...state, present: state.checkpoint, checkpoint: null } : state
     case 'apply': {
       const next = action.updater(state.present)
       if (next === state.present) return state
@@ -56,7 +59,8 @@ function reducer(state: State, action: Action): State {
 
 /**
  * Board elements with undo and redo. A gesture (begin, many updates,
- * commit) becomes one undo step; apply() is a single-step change.
+ * commit) becomes one undo step and cancel() abandons it; apply() is a
+ * single-step change.
  */
 export function useBoardHistory(init: () => Elements) {
   const [state, dispatch] = useReducer(reducer, undefined, () => ({ past: [], present: init(), future: [], checkpoint: null }))
@@ -64,12 +68,13 @@ export function useBoardHistory(init: () => Elements) {
   const begin = useCallback(() => dispatch({ type: 'begin' }), [])
   const update = useCallback((updater: Updater) => dispatch({ type: 'update', updater }), [])
   const commit = useCallback(() => dispatch({ type: 'commit' }), [])
+  const cancel = useCallback(() => dispatch({ type: 'cancel' }), [])
   const apply = useCallback((updater: Updater) => dispatch({ type: 'apply', updater }), [])
   const undo = useCallback(() => dispatch({ type: 'undo' }), [])
   const redo = useCallback(() => dispatch({ type: 'redo' }), [])
   const load = useCallback((elements: Elements) => dispatch({ type: 'load', elements }), [])
 
-  const actions = useMemo(() => ({ begin, update, commit, apply, undo, redo, load }), [begin, update, commit, apply, undo, redo, load])
+  const actions = useMemo(() => ({ begin, update, commit, cancel, apply, undo, redo, load }), [begin, update, commit, cancel, apply, undo, redo, load])
 
   return {
     elements: state.present,
