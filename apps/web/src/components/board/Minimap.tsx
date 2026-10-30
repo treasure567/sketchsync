@@ -1,5 +1,5 @@
 import { Map as MapIcon, X } from 'lucide-react'
-import { useEffect, useRef, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { cameraToFit, unionBounds, viewportBounds } from '@/lib/board/geometry'
 import { renderScene } from '@/lib/board/render'
 import type { BoardElement, Bounds, Camera, Point } from '@/lib/board/types'
@@ -21,6 +21,8 @@ type MinimapProps = {
 export function Minimap({ elements, camera, viewport, onNavigate, onClose }: MinimapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const dragging = useRef(false)
+  // Bumped when an image finishes loading, to redraw with it.
+  const [, setImagesLoaded] = useState(0)
 
   const visible = viewportBounds(camera, viewport.width, viewport.height)
   const content = unionBounds(elements)
@@ -41,7 +43,7 @@ export function Minimap({ elements, camera, viewport, onNavigate, onClose }: Min
     const pixelRatio = window.devicePixelRatio || 1
     canvas.width = WIDTH * pixelRatio
     canvas.height = HEIGHT * pixelRatio
-    renderScene(ctx, { elements, camera: miniCamera, width: WIDTH, height: HEIGHT, pixelRatio, background: '#f6f6fb' })
+    renderScene(ctx, { elements, camera: miniCamera, width: WIDTH, height: HEIGHT, pixelRatio, background: '#f6f6fb', onImageLoad: () => setImagesLoaded((count) => count + 1) })
 
     // Outline of the area the main view shows.
     ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)

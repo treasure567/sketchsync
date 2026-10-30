@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { CircleHelp, Hand, Map as MapIcon, Minus, Plus, Redo2, ShieldCheck, Undo2 } from 'lucide-react'
+import { CircleHelp, Hand, Map as MapIcon, Minus, Plus, Redo2, Scan, ShieldCheck, Undo2 } from 'lucide-react'
 import { Kbd } from '@/components/ui/Kbd'
 
 const group = 'pointer-events-auto flex items-center rounded-lg bg-surface shadow-sm ring-1 ring-line'
@@ -10,6 +10,7 @@ type BoardControlsProps = {
   onZoomIn: () => void
   onZoomOut: () => void
   onResetZoom: () => void
+  onZoomToFit: () => void
   canUndo: boolean
   canRedo: boolean
   onUndo: () => void
@@ -17,7 +18,7 @@ type BoardControlsProps = {
 }
 
 /** Zoom and undo/redo controls for the bottom-left corner. */
-export function BoardControls({ zoom, onZoomIn, onZoomOut, onResetZoom, canUndo, canRedo, onUndo, onRedo }: BoardControlsProps) {
+export function BoardControls({ zoom, onZoomIn, onZoomOut, onResetZoom, onZoomToFit, canUndo, canRedo, onUndo, onRedo }: BoardControlsProps) {
   return (
     <div className="flex items-center gap-2">
       <div className={group}>
@@ -35,6 +36,10 @@ export function BoardControls({ zoom, onZoomIn, onZoomOut, onResetZoom, canUndo,
         </button>
         <button type="button" aria-label="Zoom in" title="Zoom in — Ctrl +" onClick={onZoomIn} className={iconButton}>
           <Plus className="size-3.5" />
+        </button>
+        <span className="h-4 w-px bg-line" />
+        <button type="button" aria-label="Zoom to fit" title="Zoom to fit — Shift 1" onClick={onZoomToFit} className={iconButton}>
+          <Scan className="size-3.5" />
         </button>
       </div>
       <div className={group}>

@@ -28,7 +28,7 @@ export function ElementsPreview({ elements, className, padding = 12 }: ElementsP
     canvas.width = Math.round(width * pixelRatio)
     canvas.height = Math.round(height * pixelRatio)
     const draw = () =>
-      renderScene(ctx, { elements, camera: cameraToFit(bounds, width, height, padding, 1.5), width, height, pixelRatio })
+      renderScene(ctx, { elements, camera: cameraToFit(bounds, width, height, padding, 1.5), width, height, pixelRatio, onImageLoad: draw })
     draw()
     // Redraw once web fonts are ready so text renders in the right typeface.
     document.fonts.ready.then(draw)

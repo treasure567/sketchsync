@@ -1,5 +1,13 @@
 import clsx from 'clsx'
 import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignHorizontalSpaceAround,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  AlignVerticalSpaceAround,
   ArrowDown,
   ArrowDownToLine,
   ArrowUp,
@@ -9,15 +17,17 @@ import {
   CircleHelp,
   Copy,
   Grid3x3,
+  Group,
   Library,
   Lock,
   LockOpen,
   PaintBucket,
   Pipette,
   Trash2,
+  Ungroup,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import type { LayerMove } from '@/lib/board/actions'
+import type { Alignment, LayerMove } from '@/lib/board/actions'
 import type { ElementStyle, ElementType, FillStyle, StrokeStyle } from '@/lib/board/types'
 
 const STROKE_COLORS = ['#1f2433', '#4f46e5', '#16a06a', '#f59e0b', '#ef4444']
@@ -26,6 +36,22 @@ const STROKE_WIDTHS = [
   { value: 1, label: 'Thin' },
   { value: 2, label: 'Medium' },
   { value: 4, label: 'Bold' },
+]
+
+const FONT_SIZES = [
+  { value: 16, label: 'S' },
+  { value: 20, label: 'M' },
+  { value: 28, label: 'L' },
+  { value: 40, label: 'XL' },
+]
+
+const alignments: { value: Alignment; label: string; icon: typeof Group }[] = [
+  { value: 'left', label: 'Align left', icon: AlignStartVertical },
+  { value: 'center', label: 'Align centre', icon: AlignCenterVertical },
+  { value: 'right', label: 'Align right', icon: AlignEndVertical },
+  { value: 'top', label: 'Align top', icon: AlignStartHorizontal },
+  { value: 'middle', label: 'Align middle', icon: AlignCenterHorizontal },
+  { value: 'bottom', label: 'Align bottom', icon: AlignEndHorizontal },
 ]
 
 const shapeTypes: ElementType[] = ['rectangle', 'diamond', 'ellipse']
@@ -38,9 +64,16 @@ type StylePanelProps = {
   style: ElementStyle
   onStyleChange: (patch: Partial<ElementStyle>) => void
   onHelp: () => void
+  /** Text size control, when text is selected or the text tool is active. */
+  fontSize?: { value: number; onChange: (size: number) => void }
   /** Present when elements are selected (not just a tool). */
   selection?: {
+    count: number
+    grouped: boolean
     locked: boolean
+    onAlign: (alignment: Alignment) => void
+    onDistribute: (axis: 'horizontal' | 'vertical') => void
+    onToggleGroup: () => void
     onLayer: (move: LayerMove) => void
     onDuplicate: () => void
     onToggleLock: () => void
@@ -163,7 +196,7 @@ const strokeStyles: { value: StrokeStyle; label: string; content: ReactNode }[] 
 
 const iconButton = 'grid h-8 place-items-center rounded-lg bg-brand-50 text-ink transition-colors hover:bg-brand-100'
 
-export function StylePanel({ title, types, style, onStyleChange, onHelp, selection, className }: StylePanelProps) {
+export function StylePanel({ title, types, style, onStyleChange, onHelp, fontSize, selection, className }: StylePanelProps) {
   const hasShape = has(types, ...shapeTypes)
   const showStroke = has(types, ...shapeTypes, 'line', 'arrow', 'freedraw', 'text')
   const showBackground = has(types, ...shapeTypes, 'freedraw', 'sticky')
@@ -183,6 +216,17 @@ export function StylePanel({ title, types, style, onStyleChange, onHelp, selecti
       {showStroke && (
         <Section label={types.has('text') && types.size === 1 ? 'Text colour' : 'Stroke'} value={style.stroke}>
           <Swatches label="Stroke" colors={STROKE_COLORS} value={style.stroke} onChange={(stroke) => onStyleChange({ stroke })} />
+        </Section>
+      )}
+
+      {fontSize && (
+        <Section label="Text size" value={`${fontSize.value}px`}>
+          <Segmented
+            label="Text size"
+            options={FONT_SIZES.map(({ value, label }) => ({ value, label: `${label} (${value}px)`, content: label }))}
+            value={fontSize.value}
+            onChange={fontSize.onChange}
+          />
         </Section>
       )}
 
@@ -265,6 +309,30 @@ export function StylePanel({ title, types, style, onStyleChange, onHelp, selecti
         />
       </Section>
 
+      {selection && selection.count > 1 && (
+        <Section label="Align">
+          <div className="grid grid-cols-6 gap-1">
+            {alignments.map(({ value, label, icon: Icon }) => (
+              <button key={value} type="button" aria-label={label} title={label} onClick={() => selection.onAlign(value)} className={iconButton}>
+                <Icon className="size-3.5" />
+              </button>
+            ))}
+          </div>
+          {selection.count > 2 && (
+            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+              <button type="button" onClick={() => selection.onDistribute('horizontal')} aria-label="Distribute horizontally" className={clsx(iconButton, 'flex items-center justify-center gap-1.5 text-[11px] font-semibold')}>
+                <AlignHorizontalSpaceAround className="size-3.5" />
+                Distribute
+              </button>
+              <button type="button" onClick={() => selection.onDistribute('vertical')} aria-label="Distribute vertically" className={clsx(iconButton, 'flex items-center justify-center gap-1.5 text-[11px] font-semibold')}>
+                <AlignVerticalSpaceAround className="size-3.5" />
+                Vertically
+              </button>
+            </div>
+          )}
+        </Section>
+      )}
+
       {selection && (
         <>
           <Section label="Layers">
@@ -284,11 +352,22 @@ export function StylePanel({ title, types, style, onStyleChange, onHelp, selecti
             </div>
           </Section>
           <Section label="Actions">
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-1.5">
-              <button type="button" onClick={selection.onDuplicate} title="Duplicate — Ctrl D" className="flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand-50 text-[11px] font-semibold text-ink transition-colors hover:bg-brand-100">
+            <div className="flex gap-1.5">
+              <button type="button" onClick={selection.onDuplicate} title="Duplicate — Ctrl D" className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-50 text-[11px] font-semibold text-ink transition-colors hover:bg-brand-100">
                 <Copy className="size-3.5" />
                 Dup
               </button>
+              {(selection.count > 1 || selection.grouped) && (
+                <button
+                  type="button"
+                  aria-label={selection.grouped ? 'Ungroup' : 'Group'}
+                  title={selection.grouped ? 'Ungroup — Ctrl Shift G' : 'Group — Ctrl G'}
+                  onClick={selection.onToggleGroup}
+                  className={clsx(iconButton, 'w-8')}
+                >
+                  {selection.grouped ? <Ungroup className="size-3.5" /> : <Group className="size-3.5" />}
+                </button>
+              )}
               <button
                 type="button"
                 aria-label={selection.locked ? 'Unlock' : 'Lock'}
