@@ -1,4 +1,4 @@
-import { ArrowRight, Circle, Diamond, Eraser, Hand, Image, Minus, MousePointer2, Pencil, Square, StickyNote, Type, type LucideIcon } from 'lucide-react'
+import { ArrowRight, Circle, Diamond, Eraser, Hand, Image, Minus, MousePointer2, Pencil, Square, StickyNote, Type, Zap, type LucideIcon } from 'lucide-react'
 import type { Tool } from '@/lib/board/types'
 
 export type ToolDefinition = {
@@ -23,8 +23,9 @@ export const tools: ToolDefinition[] = [
   { id: 'pencil', label: 'Pencil', shortcut: 'P', icon: Pencil, hint: 'Click and drag, release when you’re finished' },
   { id: 'text', label: 'Text', shortcut: 'T', icon: Type, hint: 'Click anywhere to add text' },
   { id: 'sticky', label: 'Sticky note', shortcut: 'N', icon: StickyNote, hint: 'Click to place a sticky note' },
-  { id: 'image', label: 'Image', shortcut: 'I', icon: Image, hint: 'Images are coming soon', comingSoon: true },
+  { id: 'image', label: 'Image', shortcut: 'I', icon: Image, hint: 'Choose an image, or drop or paste one onto the board' },
   { id: 'eraser', label: 'Eraser', shortcut: 'E', icon: Eraser, hint: 'Drag over elements to erase them' },
+  { id: 'laser', label: 'Laser pointer', shortcut: 'K', icon: Zap, hint: 'Drag to point things out; the trail fades away and is not saved' },
 ]
 
 /** Tools that create elements; after one is used, the select tool comes back unless the toolbar is locked. */

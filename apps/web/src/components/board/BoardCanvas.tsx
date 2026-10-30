@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type Dispatch, type MouseEvent, type PointerEvent, type SetStateAction } from 'react'
 import { creationTools } from '@/components/board/tools'
 import type { BoardHistory } from '@/hooks/useBoardHistory'
+import { expandGroups } from '@/lib/board/actions'
+import { bindNewConnector, detachFromStaticShapes, updateBindings } from '@/lib/board/bindings'
 import { createFreedraw, createLinear, createShape, createSticky, createText, finalizeCreated, resizeFromOrigin } from '@/lib/board/elements'
 import {
   boundsContain,
@@ -16,9 +18,11 @@ import {
   screenToWorld,
   translate,
   unionBounds,
+  worldToScreen,
   zoomAt,
   type HandleId,
 } from '@/lib/board/geometry'
+import { isAcceptedImage } from '@/lib/board/images'
 import { LIBRARY_DRAG_TYPE } from '@/lib/board/library'
 import { HANDLE_SIZE, renderScene, SELECTION_PADDING } from '@/lib/board/render'
 import type { BoardElement, Bounds, Camera, ElementStyle, Point, Tool } from '@/lib/board/types'
@@ -27,16 +31,19 @@ import type { BoardElement, Bounds, Camera, ElementStyle, Point, Tool } from '@/
 const HIT_TOLERANCE = 6
 /** Ignore touches for this long after a pen was used, so a resting palm doesn't draw. */
 const PALM_REJECTION_MS = 1500
+/** How long a laser pointer trail stays visible. */
+const LASER_FADE_MS = 900
 
 type Interaction =
   | { kind: 'pan'; startScreen: Point; startCamera: Camera }
   | { kind: 'pinch'; startDistance: number; startMid: Point; startCamera: Camera }
-  | { kind: 'move'; ids: ReadonlySet<string>; last: Point }
+  | { kind: 'move'; start: Point; startBounds: Bounds; originals: Map<string, BoardElement> }
   | { kind: 'resize'; handle: HandleId; startBounds: Bounds; originals: Map<string, BoardElement> }
   | { kind: 'marquee'; origin: Point; base: ReadonlySet<string> }
   | { kind: 'create'; id: string; origin: Point }
   | { kind: 'draw'; id: string; last: Point; lastScreen: Point; pressure: number }
   | { kind: 'erase' }
+  | { kind: 'laser' }
 
 type BoardCanvasProps = {
   elements: BoardElement[]
@@ -48,9 +55,13 @@ type BoardCanvasProps = {
   currentStyle: ElementStyle
   /** Colour of selection frames: the user's cursor colour. */
   selectionColor: string
+  /** Font size for new text. */
+  currentFontSize: number
   locked: boolean
   /** Space is held, so dragging pans. */
   spaceHeld: boolean
+  /** Grid spacing in world units when snapping is on, otherwise 0. */
+  gridSize: number
   selectedIds: ReadonlySet<string>
   onSelectionChange: (ids: ReadonlySet<string>) => void
   editingId: string | null
@@ -58,6 +69,7 @@ type BoardCanvasProps = {
   onEditText: (id: string) => void
   onContextMenu: (screen: Point, world: Point) => void
   onLibraryDrop: (itemId: string, world: Point) => void
+  onImageDrop: (files: File[], world: Point) => void
   history: Pick<BoardHistory, 'begin' | 'update' | 'commit' | 'cancel' | 'apply'>
 }
 
@@ -73,28 +85,36 @@ export function BoardCanvas({
   onToolChange,
   currentStyle,
   selectionColor,
+  currentFontSize,
   locked,
   spaceHeld,
+  gridSize,
   selectedIds,
   onSelectionChange,
   editingId,
   onEditText,
   onContextMenu,
   onLibraryDrop,
+  onImageDrop,
   history,
 }: BoardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const laserCanvasRef = useRef<HTMLCanvasElement>(null)
   const interaction = useRef<Interaction | null>(null)
   const pointers = useRef(new Map<number, Point>())
   const lastPenAt = useRef(0)
+  const laserTrail = useRef<{ point: Point; time: number }[]>([])
+  const laserFrame = useRef(0)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [marquee, setMarquee] = useState<Bounds | null>(null)
   const [panning, setPanning] = useState(false)
   const [hoverCursor, setHoverCursor] = useState<string | null>(null)
-  const [fontsReady, setFontsReady] = useState(false)
+  const [assetsVersion, setAssetsVersion] = useState(0)
 
   const selected = elements.filter((element) => selectedIds.has(element.id))
   const canTransform = tool === 'select' && selected.length > 0 && selected.every((element) => !element.locked)
+  const snap = (value: number) => (gridSize ? Math.round(value / gridSize) * gridSize : value)
+  const snapPoint = (point: Point) => ({ x: snap(point.x), y: snap(point.y) })
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current
@@ -106,7 +126,7 @@ export function BoardCanvas({
 
   // Text uses web fonts; draw again once they have loaded.
   useEffect(() => {
-    document.fonts.ready.then(() => setFontsReady(true))
+    document.fonts.ready.then(() => setAssetsVersion((version) => version + 1))
   }, [])
 
   useEffect(() => {
@@ -118,8 +138,22 @@ export function BoardCanvas({
     const height = Math.round(size.height * pixelRatio)
     if (canvas.width !== width) canvas.width = width
     if (canvas.height !== height) canvas.height = height
-    renderScene(ctx, { elements, camera, width: size.width, height: size.height, pixelRatio, selectedIds, editingId, marquee, showHandles: canTransform && !marquee, selectionColor })
-  }, [elements, camera, size, selectedIds, editingId, marquee, canTransform, selectionColor, fontsReady])
+    renderScene(ctx, {
+      elements,
+      camera,
+      width: size.width,
+      height: size.height,
+      pixelRatio,
+      selectedIds,
+      editingId,
+      marquee,
+      showHandles: canTransform && !marquee,
+      selectionColor,
+      gridSize,
+      // Images decode asynchronously; redraw when each one is ready.
+      onImageLoad: () => setAssetsVersion((version) => version + 1),
+    })
+  }, [elements, camera, size, selectedIds, editingId, marquee, canTransform, selectionColor, gridSize, assetsVersion])
 
   // Wheel pans; Ctrl/⌘ + wheel (and trackpad pinch) zooms. Registered natively so the page itself never zooms.
   useEffect(() => {
@@ -141,6 +175,42 @@ export function BoardCanvas({
     return () => canvas.removeEventListener('wheel', onWheel)
   }, [onCameraChange])
 
+  useEffect(() => () => cancelAnimationFrame(laserFrame.current), [])
+
+  /** Draw the fading laser trail on its overlay, frame by frame, until it has faded out. */
+  const animateLaser = () => {
+    cancelAnimationFrame(laserFrame.current)
+    const draw = () => {
+      const canvas = laserCanvasRef.current
+      const ctx = canvas?.getContext('2d')
+      if (!canvas || !ctx) return
+      const pixelRatio = window.devicePixelRatio || 1
+      canvas.width = Math.round(canvas.clientWidth * pixelRatio)
+      canvas.height = Math.round(canvas.clientHeight * pixelRatio)
+      ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+      const now = performance.now()
+      laserTrail.current = laserTrail.current.filter((entry) => now - entry.time < LASER_FADE_MS)
+      const trail = laserTrail.current
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.shadowColor = '#f0475e'
+      ctx.shadowBlur = 8
+      for (let i = 1; i < trail.length; i++) {
+        const age = (now - trail[i].time) / LASER_FADE_MS
+        const from = worldToScreen(trail[i - 1].point, camera)
+        const to = worldToScreen(trail[i].point, camera)
+        ctx.strokeStyle = `rgba(240, 71, 94, ${1 - age})`
+        ctx.lineWidth = 4 * (1 - age * 0.6)
+        ctx.beginPath()
+        ctx.moveTo(from.x, from.y)
+        ctx.lineTo(to.x, to.y)
+        ctx.stroke()
+      }
+      if (trail.length > 0 || interaction.current?.kind === 'laser') laserFrame.current = requestAnimationFrame(draw)
+    }
+    laserFrame.current = requestAnimationFrame(draw)
+  }
+
   const toScreen = (event: { clientX: number; clientY: number }) => {
     const rect = canvasRef.current!.getBoundingClientRect()
     return { x: event.clientX - rect.left, y: event.clientY - rect.top }
@@ -159,7 +229,7 @@ export function BoardCanvas({
     const tolerance = HIT_TOLERANCE / camera.zoom
     history.update((current) => {
       const remaining = current.filter((element) => element.locked || !hitTest(element, point, tolerance))
-      return remaining.length === current.length ? current : remaining
+      return remaining.length === current.length ? current : updateBindings(remaining)
     })
   }
 
@@ -177,7 +247,7 @@ export function BoardCanvas({
   }
 
   const addTextAt = (world: Point) => {
-    const element = createText(world, currentStyle)
+    const element = createText(world, currentStyle, '', currentFontSize)
     history.apply((current) => [...current, element])
     onSelectionChange(new Set([element.id]))
     onEditText(element.id)
@@ -217,20 +287,22 @@ export function BoardCanvas({
           interaction.current = { kind: 'marquee', origin: world, base: event.shiftKey ? selectedIds : new Set() }
           return
         }
-        let selection = selectedIds
+        // Clicking any member of a group selects the whole group.
+        const hitGroup = expandGroups(elements, new Set([hit.id]))
+        let selection: ReadonlySet<string> = selectedIds
         if (event.shiftKey) {
           const toggled = new Set(selectedIds)
-          if (toggled.has(hit.id)) toggled.delete(hit.id)
-          else toggled.add(hit.id)
+          const remove = selectedIds.has(hit.id)
+          hitGroup.forEach((id) => (remove ? toggled.delete(id) : toggled.add(id)))
           selection = toggled
         } else if (!selectedIds.has(hit.id)) {
-          selection = new Set([hit.id])
+          selection = hitGroup
         }
         onSelectionChange(selection)
-        const movable = new Set(elements.filter((element) => selection.has(element.id) && !element.locked).map((element) => element.id))
-        if (movable.has(hit.id)) {
+        const movable = elements.filter((element) => selection.has(element.id) && !element.locked)
+        if (movable.some((element) => element.id === hit.id)) {
           history.begin()
-          interaction.current = { kind: 'move', ids: movable, last: world }
+          interaction.current = { kind: 'move', start: world, startBounds: unionBounds(movable)!, originals: new Map(movable.map((element) => [element.id, element])) }
         }
         return
       }
@@ -239,11 +311,12 @@ export function BoardCanvas({
       case 'ellipse':
       case 'line':
       case 'arrow': {
-        const element = tool === 'line' || tool === 'arrow' ? createLinear(tool, world, currentStyle) : createShape(tool, world, currentStyle)
+        const origin = snapPoint(world)
+        const element = tool === 'line' || tool === 'arrow' ? createLinear(tool, origin, currentStyle) : createShape(tool, origin, currentStyle)
         onSelectionChange(new Set())
         history.begin()
         history.update((current) => [...current, element])
-        interaction.current = { kind: 'create', id: element.id, origin: world }
+        interaction.current = { kind: 'create', id: element.id, origin }
         return
       }
       case 'pencil': {
@@ -256,7 +329,7 @@ export function BoardCanvas({
         return
       }
       case 'sticky': {
-        const element = createSticky(world, currentStyle)
+        const element = createSticky(snapPoint(world), currentStyle)
         history.apply((current) => [...current, element])
         onSelectionChange(new Set([element.id]))
         onEditText(element.id)
@@ -264,13 +337,18 @@ export function BoardCanvas({
         return
       }
       case 'text':
-        addTextAt(world)
+        addTextAt(snapPoint(world))
         finishCreation()
         return
       case 'eraser':
         history.begin()
         interaction.current = { kind: 'erase' }
         eraseAt(world)
+        return
+      case 'laser':
+        interaction.current = { kind: 'laser' }
+        laserTrail.current.push({ point: world, time: performance.now() })
+        animateLaser()
         return
     }
   }
@@ -310,32 +388,48 @@ export function BoardCanvas({
     const world = screenToWorld(screen, camera)
     switch (current.kind) {
       case 'move': {
-        const dx = world.x - current.last.x
-        const dy = world.y - current.last.y
-        current.last = world
-        history.update((all) => all.map((element) => (current.ids.has(element.id) ? translate(element, dx, dy) : element)))
+        // Measured from the start so grid snapping lands the selection's corner exactly on the grid.
+        const dx = snap(current.startBounds.minX + world.x - current.start.x) - current.startBounds.minX
+        const dy = snap(current.startBounds.minY + world.y - current.start.y) - current.startBounds.minY
+        const moving = new Set(current.originals.keys())
+        history.update((all) =>
+          updateBindings(
+            all.map((element) => {
+              const original = current.originals.get(element.id)
+              if (!original) return element
+              const moved = translate(original, dx, dy)
+              return moved.type === 'line' || moved.type === 'arrow' ? detachFromStaticShapes(moved, moving) : moved
+            }),
+          ),
+        )
         return
       }
       case 'resize': {
-        const next = resizeBounds(current.startBounds, current.handle, world, event.shiftKey)
-        history.update((all) => all.map((element) => {
-          const original = current.originals.get(element.id)
-          return original ? scaleElement(original, current.startBounds, next) : element
-        }))
+        const next = resizeBounds(current.startBounds, current.handle, snapPoint(world), event.shiftKey)
+        history.update((all) =>
+          updateBindings(
+            all.map((element) => {
+              const original = current.originals.get(element.id)
+              return original ? scaleElement(original, current.startBounds, next) : element
+            }),
+          ),
+        )
         return
       }
-      case 'create':
+      case 'create': {
+        const point = snapPoint(world)
         history.update((all) =>
           all.map((element) => {
             if (element.id !== current.id) return element
-            if (element.type === 'line' || element.type === 'arrow') return { ...element, points: [element.points[0], world] }
+            if (element.type === 'line' || element.type === 'arrow') return { ...element, points: [element.points[0], point] }
             if (element.type === 'rectangle' || element.type === 'diamond' || element.type === 'ellipse') {
-              return resizeFromOrigin(element, current.origin, world, event.shiftKey)
+              return resizeFromOrigin(element, current.origin, point, event.shiftKey)
             }
             return element
           }),
         )
         return
+      }
       case 'draw': {
         // Skip points closer than a pixel apart to keep strokes light.
         if (distance(world, current.last) < 1 / camera.zoom) return
@@ -351,11 +445,14 @@ export function BoardCanvas({
       case 'erase':
         eraseAt(world)
         return
+      case 'laser':
+        laserTrail.current.push({ point: world, time: performance.now() })
+        return
       case 'marquee': {
         const box = boundsFromPoints(current.origin, world)
         setMarquee(box)
         const inside = elements.filter((element) => !element.locked && boundsContain(box, getBounds(element))).map((element) => element.id)
-        onSelectionChange(new Set([...current.base, ...inside]))
+        onSelectionChange(new Set([...current.base, ...expandGroups(elements, new Set(inside))]))
         return
       }
     }
@@ -378,7 +475,11 @@ export function BoardCanvas({
         setPanning(false)
         return
       case 'create':
-        history.update((all) => all.map((element) => (element.id === current.id ? finalizeCreated(element) : element)))
+        history.update((all) => {
+          const finalized = all.map((element) => (element.id === current.id ? finalizeCreated(element) : element))
+          // Connector ends released over a shape attach to it.
+          return bindNewConnector(finalized, current.id, HIT_TOLERANCE / camera.zoom)
+        })
         history.commit()
         onSelectionChange(new Set([current.id]))
         finishCreation()
@@ -402,7 +503,7 @@ export function BoardCanvas({
     if (hit?.type === 'sticky' || hit?.type === 'text') {
       if (!hit.locked) onEditText(hit.id)
     } else if (!hit) {
-      addTextAt(world)
+      addTextAt(snapPoint(world))
     }
   }
 
@@ -411,22 +512,31 @@ export function BoardCanvas({
     const screen = toScreen(event)
     const world = screenToWorld(screen, camera)
     const hit = hitTopmost(elements, world, HIT_TOLERANCE / camera.zoom)
-    if (hit && !selectedIds.has(hit.id)) onSelectionChange(new Set([hit.id]))
+    if (hit && !selectedIds.has(hit.id)) onSelectionChange(expandGroups(elements, new Set([hit.id])))
     if (!hit) onSelectionChange(new Set())
     onContextMenu({ x: event.clientX, y: event.clientY }, world)
   }
 
   const handleDragOver = (event: DragEvent<HTMLCanvasElement>) => {
-    if (!event.dataTransfer.types.includes(LIBRARY_DRAG_TYPE)) return
+    const types = event.dataTransfer.types
+    if (!types.includes(LIBRARY_DRAG_TYPE) && !types.includes('Files')) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'copy'
   }
 
   const handleDrop = (event: DragEvent<HTMLCanvasElement>) => {
+    const world = screenToWorld(toScreen(event), camera)
     const itemId = event.dataTransfer.getData(LIBRARY_DRAG_TYPE)
-    if (!itemId) return
-    event.preventDefault()
-    onLibraryDrop(itemId, screenToWorld(toScreen(event), camera))
+    if (itemId) {
+      event.preventDefault()
+      onLibraryDrop(itemId, world)
+      return
+    }
+    const images = [...event.dataTransfer.files].filter(isAcceptedImage)
+    if (images.length > 0) {
+      event.preventDefault()
+      onImageDrop(images, world)
+    }
   }
 
   const cursor = panning
@@ -440,19 +550,22 @@ export function BoardCanvas({
           : 'crosshair'
 
   return (
-    <canvas
-      ref={canvasRef}
-      aria-label="Whiteboard canvas"
-      className="absolute inset-0 size-full touch-none"
-      style={{ cursor }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      onDoubleClick={handleDoubleClick}
-      onContextMenu={handleContextMenu}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        aria-label="Whiteboard canvas"
+        className="absolute inset-0 size-full touch-none"
+        style={{ cursor }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onDoubleClick={handleDoubleClick}
+        onContextMenu={handleContextMenu}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      />
+      <canvas ref={laserCanvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 size-full" />
+    </>
   )
 }
