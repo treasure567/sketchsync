@@ -1,7 +1,40 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource-variable/caveat';
+@import '@fontsource-variable/jetbrains-mono';
 
-/* Design tokens from the SketchSync design system go in this @theme block. */
 @theme {
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-hand: 'Caveat Variable', 'Comic Sans MS', cursive;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  /* Brand */
+  --color-brand-50: #f0eeff;
+  --color-brand-100: #e4e0ff;
+  --color-brand-200: #cdc6ff;
+  --color-brand-500: #5b4cf5;
+  --color-brand-600: #4b3ce6;
+  --color-brand-700: #3e30c4;
+
+  /* Neutrals */
+  --color-ink: #12122a;
+  --color-ink-muted: #5d5d73;
+  --color-ink-subtle: #8c8ca1;
+  --color-line: #e5e5ee;
+  --color-surface: #ffffff;
+  --color-canvas: #f6f6fa;
+  --color-board: #f1f1f7;
+
+  /* Accents (stroke colours, presence colours, sticky notes) */
+  --color-accent-red: #f0475e;
+  --color-accent-orange: #f59e0b;
+  --color-accent-green: #16a06a;
+  --color-accent-teal: #1f6f5a;
+  --color-accent-blue: #3b6ff5;
+  --color-accent-navy: #1f2433;
+  --color-sticky: #fdf1c4;
+  --color-sticky-ink: #3f3416;
 }
 
 @layer base {
@@ -12,7 +45,13 @@
   }
 
   body {
+    @apply bg-canvas font-sans text-ink;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+}
+
+@utility bg-dot-grid {
+  background-image: radial-gradient(circle, #d6d6e2 1px, transparent 1px);
+  background-size: 22px 22px;
 }
