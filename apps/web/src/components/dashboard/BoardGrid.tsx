@@ -1,7 +1,8 @@
 import clsx from 'clsx'
 import { useState } from 'react'
-import { BoardCard, CreateBoardCard } from '@/components/dashboard/BoardCard'
-import type { Board, BoardType } from '@/components/dashboard/sampleBoards'
+import { BoardCard, BoardRow, CreateBoardCard } from '@/components/dashboard/BoardCard'
+import type { BoardView } from '@/components/dashboard/TopBar'
+import type { BoardMeta, BoardType } from '@/lib/boards/store'
 
 const typeTabs: { id: BoardType | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -12,10 +13,15 @@ const typeTabs: { id: BoardType | 'all'; label: string }[] = [
 
 type BoardGridProps = {
   title: string
-  boards: Board[]
+  boards: BoardMeta[]
+  view: BoardView
+  now: number
+  /** Show the create-board card (not in Trash or Shared). */
+  canCreate: boolean
+  emptyMessage: string
 }
 
-export function BoardGrid({ title, boards }: BoardGridProps) {
+export function BoardGrid({ title, boards, view, now, canCreate, emptyMessage }: BoardGridProps) {
   const [type, setType] = useState<BoardType | 'all'>('all')
   const visible = type === 'all' ? boards : boards.filter((board) => board.type === type)
 
@@ -29,7 +35,7 @@ export function BoardGrid({ title, boards }: BoardGridProps) {
           {boards.length} {boards.length === 1 ? 'board' : 'boards'}
         </span>
 
-        <div className="-mx-1 flex w-full gap-1 overflow-x-auto px-1 sm:ml-auto sm:w-auto" role="group" aria-label="Board type">
+        <div className="scrollbar-none -mx-1 flex w-full gap-1 overflow-x-auto px-1 sm:ml-auto sm:w-auto" role="group" aria-label="Board type">
           {typeTabs.map(({ id, label }) => (
             <button
               key={id}
@@ -47,18 +53,28 @@ export function BoardGrid({ title, boards }: BoardGridProps) {
         </div>
       </div>
 
-      <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <li>
-          <CreateBoardCard />
-        </li>
-        {visible.map((board) => (
-          <li key={board.id}>
-            <BoardCard board={board} />
-          </li>
-        ))}
-      </ul>
+      {view === 'grid' ? (
+        <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {canCreate && (
+            <li>
+              <CreateBoardCard />
+            </li>
+          )}
+          {visible.map((board) => (
+            <li key={board.id}>
+              <BoardCard board={board} now={now} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="mt-5 space-y-2">
+          {visible.map((board) => (
+            <BoardRow key={board.id} board={board} now={now} />
+          ))}
+        </ul>
+      )}
 
-      {visible.length === 0 && <p className="mt-6 text-center text-sm text-ink-muted">No boards here yet.</p>}
+      {visible.length === 0 && <p className="mt-6 rounded-2xl border border-dashed border-line p-8 text-center text-sm text-ink-muted">{type === 'all' ? emptyMessage : 'No boards of this type yet.'}</p>}
     </section>
   )
 }
