@@ -1,0 +1,7 @@
+# The landing page is public; boards, dashboards and settings are personal.
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /board
+Disallow: /b/
+Disallow: /settings
