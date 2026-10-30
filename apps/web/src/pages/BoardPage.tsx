@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { BoardEditor } from '@/components/board/BoardEditor'
 import { LogoMark } from '@/components/brand/LogoMark'
 import { useBoards } from '@/hooks/useBoards'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { createBoard } from '@/lib/boards/store'
 import { getTemplate } from '@/lib/boards/templates'
 
@@ -10,6 +11,7 @@ import { getTemplate } from '@/lib/boards/templates'
 export function BoardPage() {
   const { boardId } = useParams()
   const board = useBoards().find((entry) => entry.id === boardId && entry.trashedAt === null)
+  useDocumentTitle(board?.name ?? 'Board not found')
 
   if (!board) {
     return (
@@ -31,6 +33,7 @@ export function BoardPage() {
 
 /** Creates a board (optionally from ?template=) and opens it. */
 export function NewBoardPage() {
+  useDocumentTitle('New board')
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const created = useRef(false)

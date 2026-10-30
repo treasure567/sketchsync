@@ -7,8 +7,10 @@ import { Navbar } from '@/components/layout/Navbar'
 import { Offline } from '@/components/landing/Offline'
 import { QuickSketch } from '@/components/landing/QuickSketch'
 import { Testimonials } from '@/components/landing/Testimonials'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 export function LandingPage() {
+  useDocumentTitle()
   return (
     <>
       <Navbar />

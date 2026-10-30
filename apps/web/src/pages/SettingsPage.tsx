@@ -6,6 +6,7 @@ import { DangerZone } from '@/components/settings/DangerZone'
 import { ProfileForm } from '@/components/settings/ProfileForm'
 import { SettingsLayout } from '@/components/settings/SettingsLayout'
 import { useBoards } from '@/hooks/useBoards'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { FREE_BOARD_LIMIT } from '@/lib/boards/store'
 
 type Tab = 'profile' | 'security' | 'notifications' | 'billing'
@@ -53,6 +54,7 @@ function BillingUsage() {
 }
 
 export function SettingsPage() {
+  useDocumentTitle('Account settings')
   const [tab, setTab] = useState<Tab>('profile')
 
   return (

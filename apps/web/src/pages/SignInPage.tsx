@@ -4,6 +4,7 @@ import { AuthLayout } from '@/components/auth/AuthLayout'
 import { CheckEmailCard } from '@/components/auth/signin/CheckEmailCard'
 import { LinkExpiredCard } from '@/components/auth/signin/LinkExpiredCard'
 import { RequestLinkCard } from '@/components/auth/signin/RequestLinkCard'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 type Step = 'request' | 'sent' | 'expired'
 
@@ -17,6 +18,7 @@ export function SignInPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const continueToDashboard = () => navigate('/dashboard')
   const [step, setStep] = useState<Step>(searchParams.get('link') === 'expired' ? 'expired' : 'request')
+  useDocumentTitle(step === 'expired' ? 'Link expired' : 'Sign in')
   const [email, setEmail] = useState('')
 
   const returnToLogin = () => {

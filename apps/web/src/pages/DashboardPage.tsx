@@ -10,6 +10,7 @@ import { TemplatesDialog } from '@/components/dashboard/TemplatesDialog'
 import { TemplateStrip } from '@/components/dashboard/TemplateStrip'
 import { TopBar, type BoardSort, type BoardView } from '@/components/dashboard/TopBar'
 import { useBoards } from '@/hooks/useBoards'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import type { BoardMeta } from '@/lib/boards/store'
 
 const RECENT_DAYS = 14
@@ -48,6 +49,7 @@ const emptyMessages: Record<BoardFilter, string> = {
 }
 
 export function DashboardPage() {
+  useDocumentTitle('Dashboard')
   const boards = useBoards()
   const [searchParams] = useSearchParams()
   const [now, setNow] = useState(() => Date.now())
