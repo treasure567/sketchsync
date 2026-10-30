@@ -47,6 +47,14 @@ export function Squiggle(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function Wave(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 48 12" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true" {...props}>
+      <path d="M2 6c4-5 8-5 11 0s7 5 11 0 7-5 11 0 7 5 11 0" />
+    </svg>
+  )
+}
+
 export function StarOutline(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" aria-hidden="true" {...props}>
