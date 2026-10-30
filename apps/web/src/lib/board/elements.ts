@@ -135,27 +135,93 @@ export function cloneElement(element: BoardElement, dx = 0, dy = 0): BoardElemen
   }
 }
 
-const elementTypes = new Set(['rectangle', 'diamond', 'ellipse', 'line', 'arrow', 'freedraw', 'sticky', 'text'])
+// ---------- Validation ----------
+// Elements also come from files and storage, so every field is checked and
+// rebuilt rather than trusted: a malformed or hostile file must not crash the
+// board or smuggle markup into exports.
+
+const MAX_TEXT_LENGTH = 10_000
+const MAX_POINTS = 20_000
+const COLOR = /^(transparent|#[0-9a-f]{3,8})$/i
+
+type Raw = Record<string, unknown>
+
+const isRecord = (value: unknown): value is Raw => typeof value === 'object' && value !== null && !Array.isArray(value)
+const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+const oneOf = <T extends string>(value: unknown, options: readonly T[], fallback: T) => (options.includes(value as T) ? (value as T) : fallback)
+const color = (value: unknown, fallback: string) => (typeof value === 'string' && COLOR.test(value) ? value : fallback)
+const cleanText = (value: unknown) => (typeof value === 'string' ? value.slice(0, MAX_TEXT_LENGTH) : '')
+
+function cleanStyle(raw: Raw): ElementStyle {
+  return {
+    stroke: color(raw.stroke, DEFAULT_STYLE.stroke),
+    fill: color(raw.fill, DEFAULT_STYLE.fill),
+    fillStyle: oneOf(raw.fillStyle, ['solid', 'hatch', 'cross'] as const, DEFAULT_STYLE.fillStyle),
+    strokeWidth: isNumber(raw.strokeWidth) ? clamp(raw.strokeWidth, 0.5, 40) : DEFAULT_STYLE.strokeWidth,
+    strokeStyle: oneOf(raw.strokeStyle, ['solid', 'dashed', 'dotted'] as const, DEFAULT_STYLE.strokeStyle),
+    opacity: isNumber(raw.opacity) ? clamp(raw.opacity, 0, 100) : DEFAULT_STYLE.opacity,
+    rounded: typeof raw.rounded === 'boolean' ? raw.rounded : DEFAULT_STYLE.rounded,
+    pressure: typeof raw.pressure === 'boolean' ? raw.pressure : DEFAULT_STYLE.pressure,
+  }
+}
+
+function cleanPoint(value: unknown): StrokePoint | null {
+  if (!isRecord(value) || !isNumber(value.x) || !isNumber(value.y)) return null
+  return isNumber(value.p) ? { x: value.x, y: value.y, p: clamp(value.p, 0, 1) } : { x: value.x, y: value.y }
+}
+
+function cleanBox(raw: Raw) {
+  const { x, y, width, height } = raw
+  if (!isNumber(x) || !isNumber(y) || !isNumber(width) || !isNumber(height)) return null
+  return { x, y, width, height }
+}
 
 /**
- * Turn stored data into an element, or null if it is not one. Boards saved
- * before styles existed kept fill/stroke/strokeWidth at the top level.
+ * Turn stored data into a valid element, or null if it is not one. Boards
+ * saved before styles existed kept fill/stroke/strokeWidth at the top level.
  */
 export function normalizeElement(value: unknown): BoardElement | null {
-  if (typeof value !== 'object' || value === null) return null
-  const raw = value as Record<string, unknown>
-  if (typeof raw.id !== 'string' || typeof raw.type !== 'string' || !elementTypes.has(raw.type)) return null
-  if (typeof raw.style === 'object' && raw.style !== null) return { ...raw, style: { ...DEFAULT_STYLE, ...raw.style } } as BoardElement
+  if (!isRecord(value)) return null
+  const { id, type } = value
+  if (typeof id !== 'string' || id.length === 0 || id.length > 100) return null
 
-  const { fill, stroke, strokeWidth, ...rest } = raw
-  const style: ElementStyle = {
-    ...DEFAULT_STYLE,
-    ...(typeof stroke === 'string' && { stroke }),
-    ...(typeof fill === 'string' && { fill }),
-    ...(typeof strokeWidth === 'number' && { strokeWidth }),
+  const legacy = !isRecord(value.style)
+  const style = cleanStyle(legacy ? value : (value.style as Raw))
+  const base = { id, style, ...(value.locked === true && { locked: true }) }
+
+  switch (type) {
+    case 'rectangle':
+    case 'diamond':
+    case 'ellipse': {
+      const box = cleanBox(value)
+      return box && { ...base, type, ...box }
+    }
+    case 'line':
+    case 'arrow': {
+      const points = Array.isArray(value.points) ? value.points.map(cleanPoint) : []
+      const [start, end] = points
+      if (points.length !== 2 || !start || !end) return null
+      return { ...base, type, points: [{ x: start.x, y: start.y }, { x: end.x, y: end.y }] }
+    }
+    case 'freedraw': {
+      const points = Array.isArray(value.points) ? value.points.slice(0, MAX_POINTS).map(cleanPoint) : []
+      const valid = points.filter((point): point is StrokePoint => point !== null)
+      return valid.length > 0 ? { ...base, type, points: valid } : null
+    }
+    case 'sticky': {
+      const box = cleanBox(value)
+      if (!box) return null
+      return { ...base, style: legacy ? { ...style, fill: STICKY_FILL } : style, type, ...box, text: cleanText(value.text) }
+    }
+    case 'text': {
+      const box = cleanBox(value)
+      if (!box) return null
+      return { ...base, type, ...box, text: cleanText(value.text), fontSize: isNumber(value.fontSize) ? clamp(value.fontSize, 4, 400) : DEFAULT_FONT_SIZE }
+    }
+    default:
+      return null
   }
-  if (raw.type === 'sticky') style.fill = STICKY_FILL
-  return { ...rest, style } as BoardElement
 }
 
 export function normalizeElements(values: unknown[]): BoardElement[] {
