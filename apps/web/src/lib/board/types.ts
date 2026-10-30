@@ -1,6 +1,9 @@
 /** A position in world space (board coordinates) or screen space (CSS pixels). */
 export type Point = { x: number; y: number }
 
+/** A freehand point; `p` is pen pressure from 0 to 1. */
+export type StrokePoint = Point & { p?: number }
+
 export type Bounds = { minX: number; minY: number; maxX: number; maxY: number }
 
 /**
@@ -9,48 +12,55 @@ export type Bounds = { minX: number; minY: number; maxX: number; maxY: number }
  */
 export type Camera = { x: number; y: number; zoom: number }
 
+export type FillStyle = 'solid' | 'hatch' | 'cross'
+export type StrokeStyle = 'solid' | 'dashed' | 'dotted'
+
+export type ElementStyle = {
+  /** Outline (or text) colour, or 'transparent'. */
+  stroke: string
+  /** Background colour, or 'transparent'. */
+  fill: string
+  fillStyle: FillStyle
+  strokeWidth: number
+  strokeStyle: StrokeStyle
+  /** 0 to 100. */
+  opacity: number
+  /** Rounded corners on rectangles. */
+  rounded: boolean
+  /** Freehand stroke width follows pen pressure. */
+  pressure: boolean
+}
+
+type ElementBase = {
+  id: string
+  style: ElementStyle
+  /** Locked elements can be selected but not moved, resized or erased. */
+  locked?: boolean
+}
+
 export type ShapeKind = 'rectangle' | 'diamond' | 'ellipse'
 
-export type ShapeElement = {
-  id: string
-  type: ShapeKind
+type Box = {
   x: number
   y: number
-  /** May be negative while the shape is being drawn; normalised when finished. */
+  /** May be negative while the element is being drawn; normalised when finished. */
   width: number
   height: number
-  fill: string
-  stroke: string
-  strokeWidth: number
 }
 
-export type LinearElement = {
-  id: string
-  type: 'line' | 'arrow'
-  points: [Point, Point]
-  stroke: string
-  strokeWidth: number
-}
+export type ShapeElement = ElementBase & Box & { type: ShapeKind }
 
-export type FreedrawElement = {
-  id: string
-  type: 'freedraw'
-  points: Point[]
-  stroke: string
-  strokeWidth: number
-}
+export type LinearElement = ElementBase & { type: 'line' | 'arrow'; points: [Point, Point] }
 
-export type StickyElement = {
-  id: string
-  type: 'sticky'
-  x: number
-  y: number
-  width: number
-  height: number
-  text: string
-}
+export type FreedrawElement = ElementBase & { type: 'freedraw'; points: StrokePoint[] }
 
-export type BoardElement = ShapeElement | LinearElement | FreedrawElement | StickyElement
+export type StickyElement = ElementBase & Box & { type: 'sticky'; text: string }
+
+export type TextElement = ElementBase & Box & { type: 'text'; text: string; fontSize: number }
+
+export type BoardElement = ShapeElement | LinearElement | FreedrawElement | StickyElement | TextElement
+
+export type ElementType = BoardElement['type']
 
 export type Tool =
   | 'select'
