@@ -1,11 +1,11 @@
 import type { SVGProps } from 'react'
 
-/** Rough hand-drawn loop wrapped around a word. Stretches to fit its parent. */
-export function ScribbleFrame(props: SVGProps<SVGSVGElement>) {
+/** Hand-drawn swoosh under a word, rising towards the end. Stretches to fit its parent. */
+export function Swoosh(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 300 100" preserveAspectRatio="none" fill="none" aria-hidden="true" {...props}>
+    <svg viewBox="0 0 300 20" preserveAspectRatio="none" fill="none" aria-hidden="true" {...props}>
       <path
-        d="M22 18 C 90 6, 200 4, 282 12 M8 30 C 4 55, 6 74, 14 88 M10 84 C 90 96, 200 98, 296 82"
+        d="M4 15 C 70 18, 170 17, 296 4"
         stroke="currentColor"
         strokeWidth={3.5}
         strokeLinecap="round"

@@ -1,6 +1,6 @@
 import { LogoMark } from '@/components/brand/LogoMark'
 import { BoardPreview } from '@/components/landing/BoardPreview'
-import { CurvedArrowDown, ScribbleFrame, Squiggle, StarOutline } from '@/components/landing/Doodles'
+import { CurvedArrowDown, Squiggle, StarOutline, Swoosh } from '@/components/landing/Doodles'
 import { NameTag } from '@/components/landing/NameTag'
 import { ButtonLink } from '@/components/ui/Button'
 
@@ -20,9 +20,9 @@ export function Hero() {
       <div className="relative mx-auto flex max-w-5xl flex-col items-center px-4 text-center sm:px-6">
         <h1 className="text-[2.5rem] leading-[1.1] font-extrabold tracking-[-0.04em] sm:text-5xl lg:text-[3.5rem]">
           Online{' '}
-          <span className="relative inline-block mx-1 px-3 font-hand text-[1.05em] font-bold tracking-normal text-brand-500 italic">
+          <span className="relative inline-block pr-4 pl-1 font-hand text-[1.05em] font-bold tracking-normal text-brand-500 italic">
             Whiteboard
-            <ScribbleFrame className="absolute -inset-x-1 -top-1 -bottom-0.5 h-[calc(100%+0.25rem)] w-[calc(100%+0.5rem)] text-brand-500" />
+            <Swoosh className="absolute -bottom-1 left-0 h-4 w-full text-brand-500" />
           </span>{' '}
           made simple
         </h1>
