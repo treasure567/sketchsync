@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { ShortcutsDialog } from '@/components/board/ShortcutsDialog'
 import { BoardGrid } from '@/components/dashboard/BoardGrid'
 import { boardFilters, type BoardFilter } from '@/components/dashboard/boardFilters'
@@ -48,13 +49,14 @@ const emptyMessages: Record<BoardFilter, string> = {
 
 export function DashboardPage() {
   const boards = useBoards()
+  const [searchParams] = useSearchParams()
   const [now, setNow] = useState(() => Date.now())
   const [filter, setFilter] = useState<BoardFilter>('all')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<BoardSort>('edited')
   const [view, setView] = useState<BoardView>('grid')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(() => searchParams.has('templates'))
   const [helpOpen, setHelpOpen] = useState(false)
 
   // Keep "Edited 5m ago" labels fresh.
