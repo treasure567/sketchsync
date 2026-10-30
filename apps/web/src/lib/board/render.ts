@@ -26,6 +26,8 @@ export type Scene = {
   showHandles?: boolean
   /** Fill colour behind the board, e.g. for exported images. */
   background?: string
+  /** Colour of selection outlines, handles and the marquee. */
+  selectionColor?: string
 }
 
 function dashFor(style: ElementStyle) {
@@ -218,10 +220,11 @@ export function drawElement(ctx: CanvasRenderingContext2D, element: BoardElement
 
 function drawSelection(ctx: CanvasRenderingContext2D, scene: Scene, selected: BoardElement[]) {
   const { camera } = scene
+  const color = scene.selectionColor ?? SELECTION_COLOR
   const zoom = camera.zoom
   const padding = SELECTION_PADDING / zoom
 
-  ctx.strokeStyle = SELECTION_COLOR
+  ctx.strokeStyle = color
   ctx.lineWidth = 1.5 / zoom
   for (const element of selected) {
     const { minX, minY, maxX, maxY } = getBounds(element)
@@ -254,7 +257,7 @@ function drawSelection(ctx: CanvasRenderingContext2D, scene: Scene, selected: Bo
   const badgeHeight = 18 / zoom
   const badgeX = (bounds.minX + bounds.maxX) / 2 - badgeWidth / 2
   const badgeY = bounds.maxY + padding + 10 / zoom
-  ctx.fillStyle = SELECTION_COLOR
+  ctx.fillStyle = color
   ctx.beginPath()
   ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 4 / zoom)
   ctx.fill()
@@ -288,10 +291,12 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   if (selected.length > 0) drawSelection(ctx, scene, selected)
 
   if (marquee) {
-    ctx.fillStyle = 'rgba(91, 76, 245, 0.08)'
-    ctx.strokeStyle = SELECTION_COLOR
+    ctx.strokeStyle = scene.selectionColor ?? SELECTION_COLOR
     ctx.lineWidth = 1 / camera.zoom
+    ctx.fillStyle = ctx.strokeStyle
+    ctx.globalAlpha = 0.08
     ctx.fillRect(marquee.minX, marquee.minY, marquee.maxX - marquee.minX, marquee.maxY - marquee.minY)
+    ctx.globalAlpha = 1
     ctx.strokeRect(marquee.minX, marquee.minY, marquee.maxX - marquee.minX, marquee.maxY - marquee.minY)
   }
 }

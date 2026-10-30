@@ -35,6 +35,7 @@ import { tools } from '@/components/board/tools'
 import { WelcomeOverlay } from '@/components/board/WelcomeOverlay'
 import { Menu, type MenuEntry } from '@/components/ui/Menu'
 import { useBoardHistory } from '@/hooks/useBoardHistory'
+import { useProfile } from '@/hooks/useProfile'
 import { applyStyle, deleteElements, duplicateElements, reorder, setLocked, type LayerMove } from '@/lib/board/actions'
 import { copyToClipboard, hasClipboardContent, pasteFromClipboard } from '@/lib/board/clipboard'
 import { createSticky, DEFAULT_STYLE, withText } from '@/lib/board/elements'
@@ -43,6 +44,7 @@ import { cameraToFit, screenToWorld, unionBounds, zoomAt } from '@/lib/board/geo
 import { builtInItems, createUserItem, instantiate, loadUserItems, saveUserItems, type LibraryItem } from '@/lib/board/library'
 import { readBoardFile, serializeBoard } from '@/lib/board/storage'
 import type { BoardElement, Camera, ElementStyle, ElementType, Point, Tool } from '@/lib/board/types'
+import { inkStyles } from '@/lib/profile'
 import { loadBoardElements, saveBoardElements, updateBoard, type BoardMeta, type ShareSettings } from '@/lib/boards/store'
 
 const AUTOSAVE_DELAY = 400
@@ -86,6 +88,7 @@ const fileName = (name: string, extension: string) => `${name.replace(/[\\/:*?"<
 export function BoardEditor({ board }: { board: BoardMeta }) {
   const navigate = useNavigate()
   const viewport = useViewportSize()
+  const profile = useProfile()
   const history = useBoardHistory(() => loadBoardElements(board.id))
   const { elements, canUndo, canRedo, undo, redo, apply } = history
 
@@ -94,7 +97,7 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
     return bounds ? cameraToFit(bounds, window.innerWidth, window.innerHeight, 120) : { x: -window.innerWidth / 2, y: -window.innerHeight / 2, zoom: 1 }
   })
   const [tool, setTool] = useState<Tool>('select')
-  const [currentStyle, setCurrentStyle] = useState<ElementStyle>(DEFAULT_STYLE)
+  const [currentStyle, setCurrentStyle] = useState<ElementStyle>(() => ({ ...DEFAULT_STYLE, ...inkStyles[profile.ink] }))
   const [locked, setToolLocked] = useState(false)
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set())
@@ -406,6 +409,7 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
         tool={tool}
         onToolChange={setTool}
         currentStyle={currentStyle}
+        selectionColor={profile.cursorColor}
         locked={locked}
         spaceHeld={spaceHeld}
         selectedIds={selectedIds}

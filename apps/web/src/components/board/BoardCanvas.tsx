@@ -46,6 +46,8 @@ type BoardCanvasProps = {
   onToolChange: (tool: Tool) => void
   /** Style given to newly drawn elements. */
   currentStyle: ElementStyle
+  /** Colour of selection frames: the user's cursor colour. */
+  selectionColor: string
   locked: boolean
   /** Space is held, so dragging pans. */
   spaceHeld: boolean
@@ -70,6 +72,7 @@ export function BoardCanvas({
   tool,
   onToolChange,
   currentStyle,
+  selectionColor,
   locked,
   spaceHeld,
   selectedIds,
@@ -115,8 +118,8 @@ export function BoardCanvas({
     const height = Math.round(size.height * pixelRatio)
     if (canvas.width !== width) canvas.width = width
     if (canvas.height !== height) canvas.height = height
-    renderScene(ctx, { elements, camera, width: size.width, height: size.height, pixelRatio, selectedIds, editingId, marquee, showHandles: canTransform && !marquee })
-  }, [elements, camera, size, selectedIds, editingId, marquee, canTransform, fontsReady])
+    renderScene(ctx, { elements, camera, width: size.width, height: size.height, pixelRatio, selectedIds, editingId, marquee, showHandles: canTransform && !marquee, selectionColor })
+  }, [elements, camera, size, selectedIds, editingId, marquee, canTransform, selectionColor, fontsReady])
 
   // Wheel pans; Ctrl/⌘ + wheel (and trackpad pinch) zooms. Registered natively so the page itself never zooms.
   useEffect(() => {
