@@ -9,15 +9,21 @@ import {
   FileImage,
   FileText,
   FolderOpen,
+  Grid3x3,
+  Group,
+  ImagePlus,
   Keyboard,
   LayoutGrid,
   Library,
+  ListTree,
   Lock,
   LockOpen,
   Save,
+  Scan,
   Scissors,
   SquareDashedMousePointer,
   Trash2,
+  Ungroup,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router'
@@ -26,6 +32,7 @@ import { BoardControls, BoardStatus, CanvasHint } from '@/components/board/Board
 import { BoardHeader } from '@/components/board/BoardHeader'
 import { LibraryPanel } from '@/components/board/LibraryPanel'
 import { Minimap } from '@/components/board/Minimap'
+import { OutlinePanel } from '@/components/board/OutlinePanel'
 import { ShareDialog } from '@/components/board/ShareDialog'
 import { ShortcutsDialog } from '@/components/board/ShortcutsDialog'
 import { StylePanel } from '@/components/board/StylePanel'
@@ -36,11 +43,26 @@ import { WelcomeOverlay } from '@/components/board/WelcomeOverlay'
 import { Menu, type MenuEntry } from '@/components/ui/Menu'
 import { useBoardHistory } from '@/hooks/useBoardHistory'
 import { useProfile } from '@/hooks/useProfile'
-import { applyStyle, deleteElements, duplicateElements, reorder, setLocked, type LayerMove } from '@/lib/board/actions'
+import {
+  alignElements,
+  applyStyle,
+  deleteElements,
+  distributeElements,
+  duplicateElements,
+  expandGroups,
+  groupElements,
+  nudgeElements,
+  reorder,
+  setLocked,
+  ungroupElements,
+  type Alignment,
+  type LayerMove,
+} from '@/lib/board/actions'
 import { copyToClipboard, hasClipboardContent, pasteFromClipboard } from '@/lib/board/clipboard'
-import { createSticky, DEFAULT_STYLE, withText } from '@/lib/board/elements'
+import { createImage, createSticky, DEFAULT_FONT_SIZE, DEFAULT_STYLE, withText } from '@/lib/board/elements'
 import { downloadBlob, exportPdf, exportPng, exportSvg } from '@/lib/board/export'
 import { cameraToFit, screenToWorld, unionBounds, zoomAt } from '@/lib/board/geometry'
+import { ACCEPTED_IMAGE_TYPES, isAcceptedImage, prepareImage } from '@/lib/board/images'
 import { builtInItems, createUserItem, instantiate, loadUserItems, saveUserItems, type LibraryItem } from '@/lib/board/library'
 import { readBoardFile, serializeBoard } from '@/lib/board/storage'
 import type { BoardElement, Camera, ElementStyle, ElementType, Point, Tool } from '@/lib/board/types'
@@ -49,6 +71,8 @@ import { loadBoardElements, saveBoardElements, updateBoard, type BoardMeta, type
 
 const AUTOSAVE_DELAY = 400
 const ZOOM_STEP = 1.2
+/** Grid spacing in world units when the grid is on. */
+const GRID_SIZE = 24
 
 const toolElementType: Partial<Record<Tool, ElementType>> = {
   rectangle: 'rectangle',
@@ -70,6 +94,7 @@ const typeLabels: Record<ElementType, string> = {
   freedraw: 'Drawing',
   text: 'Text',
   sticky: 'Sticky note',
+  image: 'Image',
 }
 
 function useViewportSize() {
@@ -109,7 +134,11 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
   const [shareOpen, setShareOpen] = useState(false)
   const [userItems, setUserItems] = useState(loadUserItems)
   const [savedElements, setSavedElements] = useState(elements)
+  const [gridOn, setGridOn] = useState(false)
+  const [outlineOpen, setOutlineOpen] = useState(false)
+  const [textSize, setTextSize] = useState(DEFAULT_FONT_SIZE)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   const selected = useMemo(() => elements.filter((element) => selectedIds.has(element.id)), [elements, selectedIds])
   const viewportCenter = useCallback(() => screenToWorld({ x: viewport.width / 2, y: viewport.height / 2 }, camera), [camera, viewport])
@@ -205,6 +234,72 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
   const zoomBy = useCallback((factor: number) => setCamera((current) => zoomAt(current, { x: window.innerWidth / 2, y: window.innerHeight / 2 }, current.zoom * factor)), [])
   const resetZoom = useCallback(() => setCamera((current) => zoomAt(current, { x: window.innerWidth / 2, y: window.innerHeight / 2 }, 1)), [])
 
+  const fitCamera = useCallback((target: BoardElement[]) => {
+    const bounds = unionBounds(target)
+    if (bounds) setCamera(cameraToFit(bounds, window.innerWidth, window.innerHeight, 120, 2))
+  }, [])
+  const zoomToFit = useCallback(() => fitCamera(elements), [elements, fitCamera])
+  const zoomToSelection = useCallback(() => fitCamera(selected.length > 0 ? selected : elements), [elements, fitCamera, selected])
+
+  const selectedGroupId = selected[0]?.groupId
+  const selectionIsOneGroup = !!selectedGroupId && selected.every((element) => element.groupId === selectedGroupId)
+  const groupSelected = useCallback(() => {
+    if (selectedIds.size > 1) apply((current) => groupElements(current, selectedIds))
+  }, [apply, selectedIds])
+  const ungroupSelected = useCallback(() => apply((current) => ungroupElements(current, selectedIds)), [apply, selectedIds])
+
+  const align = (alignment: Alignment) => apply((current) => alignElements(current, selectedIds, alignment))
+  const distribute = (axis: 'horizontal' | 'vertical') => apply((current) => distributeElements(current, selectedIds, axis))
+
+  const changeTextSize = (size: number) => {
+    setTextSize(size)
+    if (selectedIds.size === 0) return
+    apply((current) => current.map((element) => (selectedIds.has(element.id) && element.type === 'text' ? withText({ ...element, fontSize: size }, element.text) : element)))
+  }
+
+  const nudge = useCallback(
+    (dx: number, dy: number) => {
+      if (selectedIds.size > 0) apply((current) => nudgeElements(current, selectedIds, dx, dy))
+    },
+    [apply, selectedIds],
+  )
+
+  /** Add images centred on `at` (or the view), downscaled for storage. */
+  const insertImages = useCallback(
+    async (files: File[], at?: Point) => {
+      const center = at ?? viewportCenter()
+      const added: BoardElement[] = []
+      for (const [index, file] of files.entries()) {
+        try {
+          const { src, width, height } = await prepareImage(file)
+          added.push(createImage({ x: center.x + index * 24, y: center.y + index * 24 }, src, width, height))
+        } catch (error) {
+          window.alert(error instanceof Error ? error.message : 'That image could not be added.')
+        }
+      }
+      addElements(added)
+    },
+    [addElements, viewportCenter],
+  )
+
+  const handleImageChosen = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = [...(event.target.files ?? [])].filter(isAcceptedImage)
+    event.target.value = ''
+    if (files.length > 0) insertImages(files)
+  }
+
+  /** Switch tools; the image tool opens a file picker instead of staying active. */
+  const selectTool = useCallback((next: Tool) => {
+    if (next === 'image') imageInputRef.current?.click()
+    else setTool(next)
+  }, [])
+
+  const focusElement = (element: BoardElement) => {
+    setSelectedIds(expandGroups(elements, new Set([element.id])))
+    const bounds = unionBounds([element])
+    if (bounds) setCamera(cameraToFit(bounds, window.innerWidth, window.innerHeight, 200, 1))
+  }
+
   const openFile = useCallback(() => fileInputRef.current?.click(), [])
 
   const handleFileChosen = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -292,8 +387,12 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
           case 'x':
             cutSelected()
             break
-          case 'v':
-            paste()
+          case 'g':
+            if (event.shiftKey) ungroupSelected()
+            else groupSelected()
+            break
+          case "'":
+            setGridOn((on) => !on)
             break
           case 'd':
             duplicateSelected()
@@ -323,7 +422,24 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
         event.preventDefault()
         return
       }
-      if (event.altKey) return
+      if (event.altKey) {
+        if (event.code === 'KeyO') {
+          event.preventDefault()
+          setOutlineOpen((open) => !open)
+        }
+        return
+      }
+
+      if (event.shiftKey && event.code === 'Digit1') return zoomToFit()
+      if (event.shiftKey && event.code === 'Digit2') return zoomToSelection()
+
+      const arrows: Record<string, [number, number]> = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] }
+      if (arrows[key] && selectedIds.size > 0) {
+        event.preventDefault()
+        const step = gridOn ? GRID_SIZE : event.shiftKey ? 10 : 1
+        nudge(arrows[key][0] * step, arrows[key][1] * step)
+        return
+      }
 
       if (key === 'delete' || key === 'backspace') return deleteSelected()
       if (key === '?') return setShortcutsOpen(true)
@@ -334,7 +450,7 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
       }
       if (key === 'q') return setToolLocked((value) => !value)
       const shortcut = tools.find(({ shortcut: toolKey, comingSoon }) => !comingSoon && toolKey.toLowerCase() === key)
-      if (shortcut) setTool(shortcut.id)
+      if (shortcut) selectTool(shortcut.id)
     }
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key === ' ') setSpaceHeld(false)
@@ -349,7 +465,21 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
     }
-  }, [copySelected, cutSelected, deleteSelected, duplicateSelected, elements, openFile, paste, redo, resetZoom, saveToFile, undo, zoomBy])
+  }, [copySelected, cutSelected, deleteSelected, duplicateSelected, elements, gridOn, groupSelected, nudge, openFile, redo, resetZoom, saveToFile, selectTool, selectedIds, undo, ungroupSelected, zoomBy, zoomToFit, zoomToSelection])
+
+  // Paste: images from the system clipboard become image elements; otherwise paste copied board elements.
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      if ((event.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable="true"]')) return
+      if (document.querySelector('dialog[open]')) return
+      event.preventDefault()
+      const images = [...(event.clipboardData?.files ?? [])].filter(isAcceptedImage)
+      if (images.length > 0) insertImages(images)
+      else paste()
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [insertImages, paste])
 
   // ---------- Menus ----------
 
@@ -361,6 +491,11 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
     { label: 'Export PNG (2×)', icon: FileImage, onSelect: () => exportAs('png') },
     { label: 'Export SVG', icon: Download, onSelect: () => exportAs('svg') },
     { label: 'Export PDF', icon: FileText, onSelect: () => exportAs('pdf') },
+    'separator',
+    { label: 'Insert image…', icon: ImagePlus, shortcut: 'I', onSelect: () => selectTool('image') },
+    { label: 'Zoom to fit', icon: Scan, shortcut: 'Shift 1', onSelect: zoomToFit },
+    { label: 'Show grid & snap', icon: Grid3x3, shortcut: "Ctrl '", checked: gridOn, onSelect: () => setGridOn((on) => !on) },
+    { label: 'Board outline', icon: ListTree, shortcut: 'Alt O', checked: outlineOpen, onSelect: () => setOutlineOpen((open) => !open) },
     'separator',
     { label: 'Keyboard shortcuts & help', icon: Keyboard, shortcut: '?', onSelect: () => setShortcutsOpen(true) },
     'separator',
@@ -374,6 +509,11 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
           { label: 'Copy', icon: Copy, shortcut: 'Ctrl C', onSelect: copySelected },
           { label: 'Paste', icon: ClipboardPaste, shortcut: 'Ctrl V', onSelect: () => paste(contextMenu?.world), disabled: !hasClipboardContent() },
           { label: 'Duplicate', icon: CopyPlus, shortcut: 'Ctrl D', onSelect: duplicateSelected },
+          ...(selectionIsOneGroup
+            ? [{ label: 'Ungroup', icon: Ungroup, shortcut: 'Ctrl Shift G', onSelect: ungroupSelected }]
+            : selected.length > 1
+              ? [{ label: 'Group', icon: Group, shortcut: 'Ctrl G', onSelect: groupSelected }]
+              : []),
           'separator',
           { label: 'Bring to front', icon: ArrowUpToLine, onSelect: () => moveLayer('front') },
           { label: 'Send to back', icon: ArrowDownToLine, onSelect: () => moveLayer('back') },
@@ -409,7 +549,10 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
         tool={tool}
         onToolChange={setTool}
         currentStyle={currentStyle}
+        currentFontSize={textSize}
         selectionColor={profile.cursorColor}
+        gridSize={gridOn ? GRID_SIZE : 0}
+        onImageDrop={(files, world) => insertImages(files, world)}
         locked={locked}
         spaceHeld={spaceHeld}
         selectedIds={selectedIds}
@@ -446,7 +589,7 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 top-16 flex flex-col items-center gap-2 px-3 lg:top-3 lg:px-0">
-        <Toolbar tool={tool} locked={locked} onToolChange={setTool} onToggleLock={() => setToolLocked((value) => !value)} className="pointer-events-auto max-w-full" />
+        <Toolbar tool={tool} locked={locked} onToolChange={selectTool} onToggleLock={() => setToolLocked((value) => !value)} className="pointer-events-auto max-w-full" />
         <div className="max-md:hidden">
           <CanvasHint hint={hint} />
         </div>
@@ -459,10 +602,16 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
           style={panelStyle}
           onStyleChange={changeStyle}
           onHelp={() => setShortcutsOpen(true)}
+          fontSize={panelTypes.has('text') ? { value: selected.find((element) => element.type === 'text')?.fontSize ?? textSize, onChange: changeTextSize } : undefined}
           selection={
             selected.length > 0
               ? {
+                  count: selected.length,
+                  grouped: selectionIsOneGroup,
                   locked: allSelectedLocked,
+                  onAlign: align,
+                  onDistribute: distribute,
+                  onToggleGroup: selectionIsOneGroup ? ungroupSelected : groupSelected,
                   onLayer: moveLayer,
                   onDuplicate: duplicateSelected,
                   onToggleLock: toggleElementLock,
@@ -477,6 +626,19 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
               : 'absolute top-28 left-4 max-h-[calc(100%-11rem)] w-60 overflow-y-auto max-md:hidden'
           }
         />
+      )}
+
+      {outlineOpen && (
+        <div className="pointer-events-none absolute top-16 bottom-16 left-3 w-80 max-w-[calc(100%-1.5rem)] sm:left-4">
+          <OutlinePanel
+            elements={elements}
+            selectedIds={selectedIds}
+            onSelect={(id) => setSelectedIds(expandGroups(elements, new Set([id])))}
+            onFocus={focusElement}
+            onDelete={(id) => apply((current) => deleteElements(current, new Set([id])))}
+            onClose={() => setOutlineOpen(false)}
+          />
+        </div>
       )}
 
       {libraryOpen && (
@@ -498,6 +660,7 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
           onZoomIn={() => zoomBy(ZOOM_STEP)}
           onZoomOut={() => zoomBy(1 / ZOOM_STEP)}
           onResetZoom={resetZoom}
+          onZoomToFit={zoomToFit}
           canUndo={canUndo}
           canRedo={canRedo}
           onUndo={undo}
@@ -534,6 +697,7 @@ export function BoardEditor({ board }: { board: BoardMeta }) {
       {shareOpen && <ShareDialog board={board} onChange={updateShare} onClose={() => setShareOpen(false)} />}
 
       <input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleFileChosen} />
+      <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(',')} multiple className="hidden" onChange={handleImageChosen} />
     </div>
   )
 }
