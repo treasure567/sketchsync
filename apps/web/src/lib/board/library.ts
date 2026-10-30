@@ -1,5 +1,5 @@
 import { box, connector, label, note } from '@/lib/board/builders'
-import { cloneElement, newId, normalizeElements } from '@/lib/board/elements'
+import { cloneElements, newId, normalizeElements } from '@/lib/board/elements'
 import { unionBounds } from '@/lib/board/geometry'
 import type { BoardElement, Point } from '@/lib/board/types'
 
@@ -102,5 +102,5 @@ export function instantiate(item: LibraryItem, center: Point): BoardElement[] {
   if (!bounds) return []
   const dx = center.x - (bounds.minX + bounds.maxX) / 2
   const dy = center.y - (bounds.minY + bounds.maxY) / 2
-  return item.elements.map((element) => cloneElement(element, dx, dy))
+  return cloneElements(item.elements, dx, dy)
 }

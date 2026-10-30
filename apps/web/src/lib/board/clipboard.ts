@@ -1,4 +1,4 @@
-import { cloneElement, normalizeElements } from '@/lib/board/elements'
+import { cloneElements, normalizeElements } from '@/lib/board/elements'
 import { unionBounds } from '@/lib/board/geometry'
 import type { BoardElement, Point } from '@/lib/board/types'
 
@@ -26,7 +26,7 @@ export function pasteFromClipboard(at: Point): BoardElement[] {
   if (!bounds) return []
   const dx = at.x - (bounds.minX + bounds.maxX) / 2
   const dy = at.y - (bounds.minY + bounds.maxY) / 2
-  return elements.map((element) => cloneElement(element, dx, dy))
+  return cloneElements(elements, dx, dy)
 }
 
 export function hasClipboardContent() {
