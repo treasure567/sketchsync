@@ -4,6 +4,7 @@ import type {
   BoardElement,
   ElementStyle,
   FreedrawElement,
+  ImageElement,
   LinearElement,
   Point,
   ShapeElement,
@@ -64,6 +65,11 @@ export function createSticky(center: Point, style: ElementStyle): StickyElement 
   }
 }
 
+/** An image centred on `center`, at its natural size (already downscaled). */
+export function createImage(center: Point, src: string, width: number, height: number): ImageElement {
+  return { id: newId(), type: 'image', style: DEFAULT_STYLE, x: center.x - width / 2, y: center.y - height / 2, width, height, src }
+}
+
 export function createText(at: Point, style: ElementStyle, text = '', fontSize = DEFAULT_FONT_SIZE): TextElement {
   return { id: newId(), type: 'text', style, x: at.x, y: at.y, ...measureText(text || ' ', fontSize), text, fontSize }
 }
@@ -117,6 +123,11 @@ export function cloneElement(element: BoardElement, dx = 0, dy = 0): BoardElemen
   const copy = structuredClone(element)
   copy.id = newId()
   delete copy.locked
+  delete copy.groupId
+  if (copy.type === 'line' || copy.type === 'arrow') {
+    delete copy.startBinding
+    delete copy.endBinding
+  }
   switch (copy.type) {
     case 'line':
     case 'arrow':
@@ -135,6 +146,31 @@ export function cloneElement(element: BoardElement, dx = 0, dy = 0): BoardElemen
   }
 }
 
+/**
+ * Copies of a set of elements with new ids, moved by (dx, dy). Groups and
+ * connector attachments within the set are kept (with new ids); links to
+ * elements outside the set are dropped.
+ */
+export function cloneElements(elements: BoardElement[], dx = 0, dy = 0): BoardElement[] {
+  const copies = elements.map((element) => cloneElement(element, dx, dy))
+  const ids = new Map(elements.map((element, index) => [element.id, copies[index].id]))
+  const groups = new Map<string, string>()
+  return copies.map((copy, index) => {
+    const original = elements[index]
+    let next = copy
+    if (original.groupId) {
+      if (!groups.has(original.groupId)) groups.set(original.groupId, newId())
+      next = { ...next, groupId: groups.get(original.groupId) }
+    }
+    if ((original.type === 'line' || original.type === 'arrow') && (next.type === 'line' || next.type === 'arrow')) {
+      const startBinding = original.startBinding && ids.get(original.startBinding)
+      const endBinding = original.endBinding && ids.get(original.endBinding)
+      next = { ...next, ...(startBinding && { startBinding }), ...(endBinding && { endBinding }) }
+    }
+    return next
+  })
+}
+
 // ---------- Validation ----------
 // Elements also come from files and storage, so every field is checked and
 // rebuilt rather than trusted: a malformed or hostile file must not crash the
@@ -143,6 +179,8 @@ export function cloneElement(element: BoardElement, dx = 0, dy = 0): BoardElemen
 const MAX_TEXT_LENGTH = 10_000
 const MAX_POINTS = 20_000
 const COLOR = /^(transparent|#[0-9a-f]{3,8})$/i
+const IMAGE_SRC = /^data:image\/(png|jpeg|webp|gif);base64,[a-z0-9+/]+=*$/i
+const MAX_IMAGE_SRC_LENGTH = 4_000_000
 
 type Raw = Record<string, unknown>
 
@@ -151,6 +189,7 @@ const isNumber = (value: unknown): value is number => typeof value === 'number' 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 const oneOf = <T extends string>(value: unknown, options: readonly T[], fallback: T) => (options.includes(value as T) ? (value as T) : fallback)
 const color = (value: unknown, fallback: string) => (typeof value === 'string' && COLOR.test(value) ? value : fallback)
+const cleanId = (value: unknown) => (typeof value === 'string' && value.length > 0 && value.length <= 100 ? value : undefined)
 const cleanText = (value: unknown) => (typeof value === 'string' ? value.slice(0, MAX_TEXT_LENGTH) : '')
 
 function cleanStyle(raw: Raw): ElementStyle {
@@ -188,7 +227,8 @@ export function normalizeElement(value: unknown): BoardElement | null {
 
   const legacy = !isRecord(value.style)
   const style = cleanStyle(legacy ? value : (value.style as Raw))
-  const base = { id, style, ...(value.locked === true && { locked: true }) }
+  const groupId = cleanId(value.groupId)
+  const base = { id, style, ...(value.locked === true && { locked: true }), ...(groupId && { groupId }) }
 
   switch (type) {
     case 'rectangle':
@@ -202,7 +242,15 @@ export function normalizeElement(value: unknown): BoardElement | null {
       const points = Array.isArray(value.points) ? value.points.map(cleanPoint) : []
       const [start, end] = points
       if (points.length !== 2 || !start || !end) return null
-      return { ...base, type, points: [{ x: start.x, y: start.y }, { x: end.x, y: end.y }] }
+      const startBinding = cleanId(value.startBinding)
+      const endBinding = cleanId(value.endBinding)
+      return {
+        ...base,
+        type,
+        points: [{ x: start.x, y: start.y }, { x: end.x, y: end.y }],
+        ...(startBinding && { startBinding }),
+        ...(endBinding && { endBinding }),
+      }
     }
     case 'freedraw': {
       const points = Array.isArray(value.points) ? value.points.slice(0, MAX_POINTS).map(cleanPoint) : []
@@ -218,6 +266,12 @@ export function normalizeElement(value: unknown): BoardElement | null {
       const box = cleanBox(value)
       if (!box) return null
       return { ...base, type, ...box, text: cleanText(value.text), fontSize: isNumber(value.fontSize) ? clamp(value.fontSize, 4, 400) : DEFAULT_FONT_SIZE }
+    }
+    case 'image': {
+      const box = cleanBox(value)
+      const src = value.src
+      if (!box || typeof src !== 'string' || src.length > MAX_IMAGE_SRC_LENGTH || !IMAGE_SRC.test(src)) return null
+      return { ...base, type, ...box, src }
     }
     default:
       return null

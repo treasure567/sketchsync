@@ -1,4 +1,5 @@
 import { boundsIntersect, getBounds, handlePositions, normalizeBox, pointsBounds, unionBounds, viewportBounds } from '@/lib/board/geometry'
+import { getDrawableImage } from '@/lib/board/images'
 import { STICKY_FONT_FAMILY, TEXT_LINE_HEIGHT, textFont, wrapText } from '@/lib/board/text'
 import type { BoardElement, Bounds, Camera, ElementStyle, Point, StrokePoint } from '@/lib/board/types'
 
@@ -28,6 +29,10 @@ export type Scene = {
   background?: string
   /** Colour of selection outlines, handles and the marquee. */
   selectionColor?: string
+  /** Spacing of a background dot grid in world units, or 0 for none. */
+  gridSize?: number
+  /** Called when an image finishes loading, so the scene can be redrawn. */
+  onImageLoad?: () => void
 }
 
 function dashFor(style: ElementStyle) {
@@ -170,7 +175,7 @@ function drawText(ctx: CanvasRenderingContext2D, element: Extract<BoardElement, 
   element.text.split('\n').forEach((line, index) => ctx.fillText(line, element.x, element.y + offset + index * lineHeight))
 }
 
-export function drawElement(ctx: CanvasRenderingContext2D, element: BoardElement, editingId?: string | null) {
+export function drawElement(ctx: CanvasRenderingContext2D, element: BoardElement, editingId?: string | null, onImageLoad?: () => void) {
   const { style } = element
   ctx.globalAlpha = style.opacity / 100
 
@@ -214,6 +219,17 @@ export function drawElement(ctx: CanvasRenderingContext2D, element: BoardElement
     case 'text':
       if (element.id !== editingId) drawText(ctx, element)
       break
+    case 'image': {
+      const { x, y, width, height } = normalizeBox(element)
+      const image = getDrawableImage(element.src, onImageLoad)
+      if (image) {
+        ctx.drawImage(image, x, y, width, height)
+      } else {
+        ctx.fillStyle = '#eceef4'
+        ctx.fillRect(x, y, width, height)
+      }
+      break
+    }
   }
   ctx.globalAlpha = 1
 }
@@ -266,6 +282,23 @@ function drawSelection(ctx: CanvasRenderingContext2D, scene: Scene, selected: Bo
   ctx.fillText(label, badgeX + 6 / zoom, badgeY + badgeHeight / 2)
 }
 
+/** Dots at every grid intersection, skipped when zoomed out so far they would blur together. */
+function drawGrid(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number, gridSize: number) {
+  let step = gridSize
+  while (step * camera.zoom < 12) step *= 2
+  const visible = viewportBounds(camera, width, height)
+  const radius = 1.1 / camera.zoom
+  ctx.fillStyle = '#d3d3e0'
+  ctx.beginPath()
+  for (let x = Math.floor(visible.minX / step) * step; x <= visible.maxX; x += step) {
+    for (let y = Math.floor(visible.minY / step) * step; y <= visible.maxY; y += step) {
+      ctx.moveTo(x + radius, y)
+      ctx.arc(x, y, radius, 0, Math.PI * 2)
+    }
+  }
+  ctx.fill()
+}
+
 /** Draw the board. Elements outside the viewport are skipped. */
 export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   const { elements, camera, width, height, pixelRatio, selectedIds, editingId, marquee, background } = scene
@@ -281,11 +314,13 @@ export function renderScene(ctx: CanvasRenderingContext2D, scene: Scene) {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
+  if (scene.gridSize) drawGrid(ctx, camera, width, height, scene.gridSize)
+
   const visible = viewportBounds(camera, width, height)
   const selected: BoardElement[] = []
   for (const element of elements) {
     if (selectedIds?.has(element.id)) selected.push(element)
-    if (boundsIntersect(getBounds(element), visible)) drawElement(ctx, element, editingId)
+    if (boundsIntersect(getBounds(element), visible)) drawElement(ctx, element, editingId, scene.onImageLoad)
   }
 
   if (selected.length > 0) drawSelection(ctx, scene, selected)

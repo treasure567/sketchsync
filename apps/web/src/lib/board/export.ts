@@ -1,4 +1,5 @@
 import { normalizeBox, unionBounds } from '@/lib/board/geometry'
+import { getDrawableImage } from '@/lib/board/images'
 import { pressureWidth, renderScene } from '@/lib/board/render'
 import { STICKY_FONT_FAMILY, TEXT_FONT_FAMILY, TEXT_LINE_HEIGHT, wrapText } from '@/lib/board/text'
 import type { BoardElement, Bounds, ElementStyle, Point } from '@/lib/board/types'
@@ -22,6 +23,10 @@ function exportBounds(elements: BoardElement[]): Bounds {
 /** Draw the elements on a white canvas at `scale` times their size. */
 async function renderToCanvas(elements: BoardElement[], scale: number) {
   await document.fonts.ready
+  // Images must be decoded before they can be drawn.
+  await Promise.all(
+    elements.filter((element) => element.type === 'image').map((element) => new Promise<void>((resolve) => (getDrawableImage(element.src, resolve) ? resolve() : undefined))),
+  )
   const bounds = exportBounds(elements)
   const width = bounds.maxX - bounds.minX
   const height = bounds.maxY - bounds.minY
@@ -124,6 +129,10 @@ function elementToSvg(element: BoardElement, patterns: Map<string, string>, meas
       measure.font = `600 20px ${STICKY_FONT_FAMILY}`
       const lines = wrapText(measure, element.text, element.width - 32)
       return `<g${opacity}><rect x="${round(element.x)}" y="${round(element.y)}" width="${round(element.width)}" height="${round(element.height)}" fill="${escapeXml(style.fill)}"/><text font-family='${STICKY_FONT_FAMILY}' font-size="20" font-weight="600" fill="#3f3416" dominant-baseline="hanging">${textLines(lines, element.x + 16, element.y + 16, 24)}</text></g>`
+    }
+    case 'image': {
+      const { x, y, width, height } = normalizeBox(element)
+      return `<image href="${escapeXml(element.src)}" x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(height)}" preserveAspectRatio="none"${opacity}/>`
     }
     case 'text': {
       const lineHeight = element.fontSize * TEXT_LINE_HEIGHT

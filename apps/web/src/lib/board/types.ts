@@ -36,6 +36,8 @@ type ElementBase = {
   style: ElementStyle
   /** Locked elements can be selected but not moved, resized or erased. */
   locked?: boolean
+  /** Elements sharing a group id are selected and moved together. */
+  groupId?: string
 }
 
 export type ShapeKind = 'rectangle' | 'diamond' | 'ellipse'
@@ -50,7 +52,13 @@ type Box = {
 
 export type ShapeElement = ElementBase & Box & { type: ShapeKind }
 
-export type LinearElement = ElementBase & { type: 'line' | 'arrow'; points: [Point, Point] }
+export type LinearElement = ElementBase & {
+  type: 'line' | 'arrow'
+  points: [Point, Point]
+  /** Ids of the shapes the ends are attached to; attached ends follow those shapes. */
+  startBinding?: string
+  endBinding?: string
+}
 
 export type FreedrawElement = ElementBase & { type: 'freedraw'; points: StrokePoint[] }
 
@@ -58,7 +66,10 @@ export type StickyElement = ElementBase & Box & { type: 'sticky'; text: string }
 
 export type TextElement = ElementBase & Box & { type: 'text'; text: string; fontSize: number }
 
-export type BoardElement = ShapeElement | LinearElement | FreedrawElement | StickyElement | TextElement
+/** A picture, stored as a downscaled data URL. */
+export type ImageElement = ElementBase & Box & { type: 'image'; src: string }
+
+export type BoardElement = ShapeElement | LinearElement | FreedrawElement | StickyElement | TextElement | ImageElement
 
 export type ElementType = BoardElement['type']
 
@@ -75,3 +86,4 @@ export type Tool =
   | 'sticky'
   | 'image'
   | 'eraser'
+  | 'laser'
