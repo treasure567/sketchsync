@@ -1,13 +1,14 @@
 import clsx from 'clsx'
-import { EllipsisVertical, LogOut, Plus, Settings, UserRound, X } from 'lucide-react'
+import { EllipsisVertical, LogOut, Plus, Settings, X } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { Logo } from '@/components/brand/Logo'
 import { boardFilters, type BoardFilter } from '@/components/dashboard/boardFilters'
 import { ButtonLink } from '@/components/ui/Button'
 import { Menu } from '@/components/ui/Menu'
 import { FREE_BOARD_LIMIT } from '@/lib/boards/store'
-import { currentUser } from '@/lib/session'
+import { Avatar } from '@/components/ui/Avatar'
+import { useProfile } from '@/hooks/useProfile'
 
 type SidebarProps = {
   filter: BoardFilter
@@ -20,6 +21,7 @@ type SidebarProps = {
 
 export function Sidebar({ filter, boardCount, onFilterChange, onClose }: SidebarProps) {
   const navigate = useNavigate()
+  const profile = useProfile()
   const [accountOpen, setAccountOpen] = useState(false)
   const used = Math.min(boardCount, FREE_BOARD_LIMIT)
 
@@ -78,18 +80,16 @@ export function Sidebar({ filter, boardCount, onFilterChange, onClose }: Sidebar
           </div>
         </div>
 
-        <button type="button" aria-disabled="true" title="Settings are coming soon" className="flex w-full cursor-default items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-ink-muted">
+        <Link to="/settings" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-ink-muted hover:bg-brand-50 hover:text-ink">
           <Settings className="size-4" />
           Settings
-        </button>
+        </Link>
 
         <div className="flex items-center gap-3 px-2 pt-1">
-          <span className="grid size-9 place-items-center rounded-full bg-brand-500 text-white" aria-hidden="true">
-            <UserRound className="size-5" />
-          </span>
+          <Avatar name={profile.name} src={profile.avatar} className="size-9 text-xs" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-ink">{currentUser.name}</span>
-            <span className="block truncate text-xs text-ink-subtle">{currentUser.handle}</span>
+            <span className="block truncate text-sm font-semibold text-ink">{profile.name}</span>
+            <span className="block truncate text-xs text-ink-subtle">@{profile.handle}</span>
           </span>
           <div className="relative">
             <button
@@ -107,7 +107,10 @@ export function Sidebar({ filter, boardCount, onFilterChange, onClose }: Sidebar
                 label="Account"
                 onClose={() => setAccountOpen(false)}
                 className="absolute right-0 bottom-10"
-                items={[{ label: 'Sign out', icon: LogOut, onSelect: () => navigate('/') }]}
+                items={[
+                  { label: 'Account settings', icon: Settings, onSelect: () => navigate('/settings') },
+                  { label: 'Sign out', icon: LogOut, onSelect: () => navigate('/') },
+                ]}
               />
             )}
           </div>

@@ -2,7 +2,9 @@ import clsx from 'clsx'
 import { Library, Menu as MenuIcon, Share2 } from 'lucide-react'
 import { useState } from 'react'
 import { Menu, type MenuEntry } from '@/components/ui/Menu'
-import { currentUser } from '@/lib/session'
+import { Link } from 'react-router'
+import { Avatar } from '@/components/ui/Avatar'
+import { useProfile } from '@/hooks/useProfile'
 
 export type SaveStatus = 'saved' | 'saving'
 
@@ -56,6 +58,7 @@ function BoardTitle({ title, onRename }: { title: string; onRename: (title: stri
 /** Main menu, board title and save state on the left; library, sharing and account on the right. */
 export function BoardHeader({ title, onRename, saveStatus, menuItems, libraryOpen, onToggleLibrary, shareCount, onShare }: BoardHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const profile = useProfile()
 
   return (
     <>
@@ -93,10 +96,10 @@ export function BoardHeader({ title, onRename, saveStatus, menuItems, libraryOpe
         >
           <Library className="size-[18px]" />
         </button>
-        <span className="flex h-9 items-center gap-2 rounded-lg px-1.5" title={currentUser.name}>
-          <span className="grid size-7 place-items-center rounded-full bg-brand-100 text-[10px] font-bold text-brand-600">{currentUser.initials}</span>
-          <span className="text-xs font-medium text-ink max-md:hidden">{currentUser.name}</span>
-        </span>
+        <Link to="/settings" className="flex h-9 items-center gap-2 rounded-lg px-1.5 hover:bg-brand-50" title="Account settings">
+          <Avatar name={profile.name} src={profile.avatar} className="size-7 text-[10px]" />
+          <span className="text-xs font-medium text-ink max-md:hidden">{profile.name}</span>
+        </Link>
       </div>
     </>
   )

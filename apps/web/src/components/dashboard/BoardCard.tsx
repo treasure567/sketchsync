@@ -5,7 +5,8 @@ import { Link, useNavigate } from 'react-router'
 import { ElementsPreview } from '@/components/board/ElementsPreview'
 import { Menu, type MenuEntry } from '@/components/ui/Menu'
 import { deleteBoardForever, duplicateBoard, loadBoardElements, updateBoard, type BoardMeta } from '@/lib/boards/store'
-import { currentUser } from '@/lib/session'
+import { Avatar } from '@/components/ui/Avatar'
+import { useProfile } from '@/hooks/useProfile'
 import { timeAgo } from '@/lib/time'
 
 type BoardItemProps = {
@@ -119,6 +120,7 @@ function BoardThumbnail({ board, className }: { board: BoardMeta; className?: st
 
 export function BoardCard({ board, now }: BoardItemProps) {
   const { menu, title, trashed } = useBoardActions(board)
+  const profile = useProfile()
   const shared = board.share.invites.length
 
   return (
@@ -140,8 +142,8 @@ export function BoardCard({ board, now }: BoardItemProps) {
 
         <div className="mt-4 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="grid size-7 place-items-center rounded-full bg-brand-500 text-[9px] font-bold text-white ring-2 ring-surface" title={currentUser.name}>
-              {currentUser.initials}
+            <span title={profile.name}>
+              <Avatar name={profile.name} src={profile.avatar} className="size-7 text-[9px] ring-2 ring-surface" />
             </span>
             {shared > 0 && (
               <span className="flex items-center gap-1 text-[11px] text-ink-muted" title={`${shared} invited`}>
