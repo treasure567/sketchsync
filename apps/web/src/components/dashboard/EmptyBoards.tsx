@@ -8,7 +8,7 @@ const highlights = [
   { icon: Zap, label: 'Works offline, merges automatically' },
 ]
 
-export function EmptyBoards() {
+export function EmptyBoards({ onBrowseTemplates }: { onBrowseTemplates: () => void }) {
   return (
     <section
       aria-labelledby="empty-boards-heading"
@@ -28,12 +28,13 @@ export function EmptyBoards() {
         </p>
 
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-          <ButtonLink to="/board" size="lg">
+          <ButtonLink to="/board/new" size="lg">
             <Pencil className="size-4" />
             Create new board
           </ButtonLink>
           <button
             type="button"
+            onClick={onBrowseTemplates}
             className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-brand-50 px-6 text-[15px] font-semibold text-ink transition-colors hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
           >
             <LayoutTemplate className="size-4" />

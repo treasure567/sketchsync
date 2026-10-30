@@ -1,8 +1,11 @@
 import clsx from 'clsx'
 import { ArrowRight, Presentation, SquarePlus, StickyNote, Workflow, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
+import type { TemplateId } from '@/lib/boards/templates'
 
 type Template = {
+  id: TemplateId
   name: string
   description: string
   icon: LucideIcon
@@ -15,6 +18,7 @@ type Template = {
 
 const templates: Template[] = [
   {
+    id: 'blank',
     name: 'Blank',
     description: 'Freeform space with infinite pan & zoom',
     icon: SquarePlus,
@@ -22,6 +26,7 @@ const templates: Template[] = [
     accent: <span className="-rotate-6 font-hand text-lg text-ink-muted">pure freedom</span>,
   },
   {
+    id: 'brainstorm',
     name: 'Brainstorm',
     description: 'Affinity mapping, voting & sticky notes',
     icon: StickyNote,
@@ -36,6 +41,7 @@ const templates: Template[] = [
     glow: 'from-[#fde68a]/60',
   },
   {
+    id: 'lecture',
     name: 'Lecture notes',
     description: 'Split Cornell layout with sketch areas',
     icon: Presentation,
@@ -44,8 +50,9 @@ const templates: Template[] = [
     glow: 'from-accent-teal-line/50',
   },
   {
+    id: 'flowchart',
     name: 'Flowchart',
-    description: 'Auto-snapping orthogonal connectors',
+    description: 'Connected shapes for systems and flows',
     icon: Workflow,
     iconTile: 'bg-brand-100 text-brand-600',
     accent: <span className="font-hand text-xl font-semibold text-accent-teal">A → B</span>,
@@ -53,7 +60,7 @@ const templates: Template[] = [
   },
 ]
 
-export function TemplateStrip() {
+export function TemplateStrip({ onBrowseAll }: { onBrowseAll: () => void }) {
   return (
     <section aria-labelledby="templates-heading">
       <div className="flex flex-wrap items-center gap-3">
@@ -61,18 +68,18 @@ export function TemplateStrip() {
           Kickstart with a template
         </h2>
         <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-[11px] font-medium text-brand-600">4 presets</span>
-        <a href="#" className="ml-auto flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
-          View all 28 templates
+        <button type="button" onClick={onBrowseAll} className="ml-auto flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
+          Browse all templates
           <ArrowRight className="size-3.5" />
-        </a>
+        </button>
       </div>
 
       <ul className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4">
-        {templates.map(({ name, description, icon: Icon, iconTile, accent, glow }) => (
+        {templates.map(({ id, name, description, icon: Icon, iconTile, accent, glow }) => (
           <li key={name}>
-            <button
-              type="button"
-              className="relative w-full overflow-hidden rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            <Link
+              to={`/board/new?template=${id}`}
+              className="relative block w-full overflow-hidden rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
             >
               {glow && <span aria-hidden="true" className={clsx('absolute -top-10 -right-10 size-32 rounded-full bg-radial to-transparent to-70%', glow)} />}
               <span className="relative flex items-start justify-between">
@@ -83,7 +90,7 @@ export function TemplateStrip() {
               </span>
               <span className="relative mt-4 block text-sm font-bold text-ink">{name}</span>
               <span className="relative mt-1 block truncate text-xs text-ink-muted">{description}</span>
-            </button>
+            </Link>
           </li>
         ))}
       </ul>

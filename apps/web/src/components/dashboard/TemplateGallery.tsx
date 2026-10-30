@@ -1,8 +1,11 @@
 import { ArrowRight, BookOpen, Plus, Workflow } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
+import type { TemplateId } from '@/lib/boards/templates'
 import { MiniNote } from '@/components/dashboard/MiniNote'
 
 type Template = {
+  id: TemplateId
   name: string
   description: string
   preview: ReactNode
@@ -10,8 +13,9 @@ type Template = {
 
 const templates: Template[] = [
   {
+    id: 'blank',
     name: 'Blank Board',
-    description: 'Infinite dot grid workspace',
+    description: 'Infinite canvas workspace',
     preview: (
       <>
         <span className="absolute top-1/2 left-1/2 grid size-11 -translate-1/2 place-items-center rounded-full bg-surface text-brand-600 shadow-sm">
@@ -22,6 +26,7 @@ const templates: Template[] = [
     ),
   },
   {
+    id: 'brainstorm',
     name: 'Brainstorm',
     description: 'Sticky notes & voting dots',
     preview: (
@@ -39,6 +44,7 @@ const templates: Template[] = [
     ),
   },
   {
+    id: 'lecture',
     name: 'Lecture Notes',
     description: 'Cornell notes & formula blocks',
     preview: (
@@ -55,6 +61,7 @@ const templates: Template[] = [
     ),
   },
   {
+    id: 'flowchart',
     name: 'Flowchart & System',
     description: 'Connected orthogonal nodes',
     preview: (
@@ -70,7 +77,7 @@ const templates: Template[] = [
   },
 ]
 
-export function TemplateGallery() {
+export function TemplateGallery({ onBrowseAll }: { onBrowseAll: () => void }) {
   return (
     <section aria-labelledby="template-gallery-heading">
       <div className="flex flex-wrap items-center gap-3">
@@ -78,18 +85,18 @@ export function TemplateGallery() {
           <span className="size-2 rounded-full bg-brand-500" aria-hidden="true" />
           Start from a template
         </h2>
-        <a href="#" className="ml-auto flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
-          Explore all 24 kits
+        <button type="button" onClick={onBrowseAll} className="ml-auto flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
+          Browse all templates
           <ArrowRight className="size-3.5" />
-        </a>
+        </button>
       </div>
 
       <ul className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4">
-        {templates.map(({ name, description, preview }) => (
+        {templates.map(({ id, name, description, preview }) => (
           <li key={name}>
-            <button
-              type="button"
-              className="w-full overflow-hidden rounded-xl border border-line bg-surface p-2 text-left shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            <Link
+              to={`/board/new?template=${id}`}
+              className="block w-full overflow-hidden rounded-xl border border-line bg-surface p-2 text-left shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
             >
               <span className="relative block h-24 overflow-hidden rounded-lg bg-[#f4f4fa] sm:h-28" aria-hidden="true">
                 {preview}
@@ -98,7 +105,7 @@ export function TemplateGallery() {
                 <span className="block truncate text-sm font-bold text-ink">{name}</span>
                 <span className="mt-0.5 block truncate text-xs text-ink-muted">{description}</span>
               </span>
-            </button>
+            </Link>
           </li>
         ))}
       </ul>
