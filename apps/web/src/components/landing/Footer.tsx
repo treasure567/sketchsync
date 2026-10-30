@@ -26,8 +26,14 @@ const destinations: Record<string, string> = {
   'Infinite Canvas': '#features',
   Wireframing: '#quick-sketch',
   'Real-time Sync': '#collaboration',
+  Documentation: '/help',
+  'Shortcut Cheatsheet': '/help#shortcuts',
   'Community Templates': '/dashboard',
   'Community Boards': '/dashboard',
+  'Privacy Policy': '/privacy',
+  'Terms of Service': '/terms',
+  'Security Overview': '/privacy#security',
+  'Cookie Settings': '/privacy#cookies',
 }
 
 const currentYear = new Date().getFullYear()

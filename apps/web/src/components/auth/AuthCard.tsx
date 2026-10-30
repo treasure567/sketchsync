@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import type { ComponentType, ReactNode, SVGProps } from 'react'
+import { Link } from 'react-router'
 import { FacebookIcon, GitHubIcon, GoogleIcon } from '@/components/brand/SocialIcons'
 import { outlineButton } from '@/components/auth/buttonStyles'
 import { HandUnderline } from '@/components/landing/Doodles'
@@ -97,13 +98,13 @@ export function TermsNotice() {
   return (
     <p className="mt-6 border-t border-line pt-5 text-center text-xs text-ink-muted">
       By continuing you agree to our{' '}
-      <a href="#" className="underline underline-offset-2 hover:text-ink">
+      <Link to="/terms" className="underline underline-offset-2 hover:text-ink">
         Terms of Use
-      </a>{' '}
+      </Link>{' '}
       and{' '}
-      <a href="#" className="underline underline-offset-2 hover:text-ink">
+      <Link to="/privacy" className="underline underline-offset-2 hover:text-ink">
         Privacy Policy
-      </a>
+      </Link>
       .
     </p>
   )

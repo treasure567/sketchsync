@@ -1,20 +1,8 @@
 import { Keyboard } from 'lucide-react'
+import { generalShortcuts } from '@/components/board/shortcuts'
 import { tools } from '@/components/board/tools'
 import { Dialog } from '@/components/ui/Dialog'
 import { Kbd } from '@/components/ui/Kbd'
-
-const general: [string, string][] = [
-  ['Undo / redo', 'Ctrl Z · Ctrl Shift Z'],
-  ['Cut / copy / paste', 'Ctrl X · Ctrl C · Ctrl V'],
-  ['Duplicate', 'Ctrl D'],
-  ['Select all', 'Ctrl A'],
-  ['Delete selection', 'Del'],
-  ['Lock tool after drawing', 'Q'],
-  ['Pan the canvas', 'Space + drag'],
-  ['Zoom in / out / reset', 'Ctrl + · Ctrl − · Ctrl 0'],
-  ['Open / save diagram', 'Ctrl O · Ctrl S'],
-  ['Show shortcuts', '?'],
-]
 
 export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
   return (
@@ -37,7 +25,7 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
         <section>
           <h3 className="mb-2 text-[10px] font-bold tracking-wider text-ink-muted uppercase">General</h3>
           <ul className="space-y-1.5">
-            {general.map(([label, keys]) => (
+            {generalShortcuts.map(([label, keys]) => (
               <li key={label} className="flex items-center justify-between gap-3 text-sm">
                 <span>{label}</span>
                 <span className="font-mono text-[11px] text-ink-muted">{keys}</span>
