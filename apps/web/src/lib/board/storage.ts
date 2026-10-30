@@ -2,6 +2,8 @@ import { normalizeElements } from '@/lib/board/elements'
 import type { BoardElement } from '@/lib/board/types'
 
 const FORMAT = 'sketchsync'
+/** Larger files are refused rather than freezing the tab while parsing. */
+const MAX_FILE_BYTES = 20 * 1024 * 1024
 
 type BoardFile = { type: typeof FORMAT; version: 1; elements: BoardElement[] }
 
@@ -19,6 +21,7 @@ export function serializeBoard(elements: BoardElement[]) {
 
 /** Read a diagram file chosen by the user. */
 export async function readBoardFile(file: File): Promise<BoardElement[]> {
+  if (file.size > MAX_FILE_BYTES) throw new Error('This file is too large to open.')
   const elements = parseBoardData(JSON.parse(await file.text()))
   if (!elements) throw new Error('This file is not a SketchSync diagram.')
   return elements

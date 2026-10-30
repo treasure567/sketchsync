@@ -65,18 +65,18 @@ function dashArray(style: ElementStyle) {
 /** Builds hatch patterns on demand and returns the fill attribute value. */
 function fillValue(style: ElementStyle, patterns: Map<string, string>) {
   if (style.fill === 'transparent') return 'none'
-  if (style.fillStyle === 'solid') return style.fill
+  if (style.fillStyle === 'solid') return escapeXml(style.fill)
   const id = `fill-${style.fillStyle}-${style.fill.replace(/[^a-z0-9]/gi, '')}`
   if (!patterns.has(id)) {
     const lines = style.fillStyle === 'cross' ? '<path d="M0 0V9M0 0H9"/>' : '<path d="M0 0V9"/>'
-    patterns.set(id, `<pattern id="${id}" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><g stroke="${style.fill}" stroke-width="1.5">${lines}</g></pattern>`)
+    patterns.set(id, `<pattern id="${id}" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><g stroke="${escapeXml(style.fill)}" stroke-width="1.5">${lines}</g></pattern>`)
   }
   return `url(#${id})`
 }
 
 function strokeAttrs(style: ElementStyle, width = style.strokeWidth) {
   if (style.stroke === 'transparent') return 'stroke="none"'
-  return `stroke="${style.stroke}" stroke-width="${round(width)}" stroke-linecap="round" stroke-linejoin="round"${dashArray(style)}`
+  return `stroke="${escapeXml(style.stroke)}" stroke-width="${round(width)}" stroke-linecap="round" stroke-linejoin="round"${dashArray(style)}`
 }
 
 function textLines(lines: string[], x: number, y: number, lineHeight: number) {
@@ -123,12 +123,12 @@ function elementToSvg(element: BoardElement, patterns: Map<string, string>, meas
     case 'sticky': {
       measure.font = `600 20px ${STICKY_FONT_FAMILY}`
       const lines = wrapText(measure, element.text, element.width - 32)
-      return `<g${opacity}><rect x="${round(element.x)}" y="${round(element.y)}" width="${round(element.width)}" height="${round(element.height)}" fill="${style.fill}"/><text font-family='${STICKY_FONT_FAMILY}' font-size="20" font-weight="600" fill="#3f3416" dominant-baseline="hanging">${textLines(lines, element.x + 16, element.y + 16, 24)}</text></g>`
+      return `<g${opacity}><rect x="${round(element.x)}" y="${round(element.y)}" width="${round(element.width)}" height="${round(element.height)}" fill="${escapeXml(style.fill)}"/><text font-family='${STICKY_FONT_FAMILY}' font-size="20" font-weight="600" fill="#3f3416" dominant-baseline="hanging">${textLines(lines, element.x + 16, element.y + 16, 24)}</text></g>`
     }
     case 'text': {
       const lineHeight = element.fontSize * TEXT_LINE_HEIGHT
       const offset = (lineHeight - element.fontSize) / 2
-      return `<text font-family='${TEXT_FONT_FAMILY}' font-size="${round(element.fontSize)}" font-weight="500" fill="${style.stroke}" dominant-baseline="hanging"${opacity}>${textLines(element.text.split('\n'), element.x, element.y + offset, lineHeight)}</text>`
+      return `<text font-family='${TEXT_FONT_FAMILY}' font-size="${round(element.fontSize)}" font-weight="500" fill="${escapeXml(style.stroke)}" dominant-baseline="hanging"${opacity}>${textLines(element.text.split('\n'), element.x, element.y + offset, lineHeight)}</text>`
     }
   }
 }
