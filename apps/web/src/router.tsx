@@ -1,20 +1,27 @@
 import { createBrowserRouter, Navigate } from 'react-router'
-import { BoardPage, NewBoardPage } from '@/pages/BoardPage'
-import { DashboardPage } from '@/pages/DashboardPage'
+import { NotFoundPage } from '@/components/layout/MessagePage'
+import { PageLoading } from '@/components/layout/PageLoading'
 import { LandingPage } from '@/pages/LandingPage'
-import { SettingsPage } from '@/pages/SettingsPage'
-import { SignInPage } from '@/pages/SignInPage'
-import { SignUpPage } from '@/pages/SignUpPage'
 
+/*
+ * The landing page ships in the main bundle; every other page loads on
+ * demand, so first visits on slow connections download as little as possible.
+ */
 export const router = createBrowserRouter([
-  { path: '/', element: <LandingPage /> },
-  { path: '/signup', element: <SignUpPage /> },
-  { path: '/signin', element: <SignInPage /> },
-  { path: '/dashboard', element: <DashboardPage /> },
-  { path: '/settings', element: <SettingsPage /> },
-  { path: '/board', element: <Navigate to="/board/new" replace /> },
-  { path: '/board/new', element: <NewBoardPage /> },
-  { path: '/board/:boardId', element: <BoardPage /> },
-  // Share links
-  { path: '/b/:boardId', element: <BoardPage /> },
+  {
+    HydrateFallback: PageLoading,
+    children: [
+      { path: '/', element: <LandingPage /> },
+      { path: '/signup', lazy: async () => ({ Component: (await import('@/pages/SignUpPage')).SignUpPage }) },
+      { path: '/signin', lazy: async () => ({ Component: (await import('@/pages/SignInPage')).SignInPage }) },
+      { path: '/dashboard', lazy: async () => ({ Component: (await import('@/pages/DashboardPage')).DashboardPage }) },
+      { path: '/settings', lazy: async () => ({ Component: (await import('@/pages/SettingsPage')).SettingsPage }) },
+      { path: '/board', element: <Navigate to="/board/new" replace /> },
+      { path: '/board/new', lazy: async () => ({ Component: (await import('@/pages/BoardPage')).NewBoardPage }) },
+      { path: '/board/:boardId', lazy: async () => ({ Component: (await import('@/pages/BoardPage')).BoardPage }) },
+      // Share links
+      { path: '/b/:boardId', lazy: async () => ({ Component: (await import('@/pages/BoardPage')).SharedBoardPage }) },
+      { path: '*', element: <NotFoundPage /> },
+    ],
+  },
 ])
