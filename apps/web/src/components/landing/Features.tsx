@@ -1,30 +1,44 @@
-import { HandUnderline } from '@/components/landing/Doodles'
-import { FeatureCards } from '@/components/landing/FeatureCards'
+import { Pointer, RefreshCw, Shapes } from 'lucide-react'
+import { FeatureCards, type Feature } from '@/components/landing/FeatureCards'
+import { SectionHeading } from '@/components/landing/SectionHeading'
 import { ShowcasePreview } from '@/components/landing/ShowcasePreview'
+
+const features: Feature[] = [
+  {
+    icon: Pointer,
+    title: 'Easy to use',
+    description: 'Intuitive gestures and zero learning curve so anyone can jump in instantly.',
+  },
+  {
+    icon: Shapes,
+    title: 'Libraries',
+    description: 'Reusable stencils, wireframe components, and custom UI icon kits.',
+  },
+  {
+    icon: RefreshCw,
+    title: 'Real-time sync',
+    description: 'Millisecond latency canvas sync across unlimited remote collaborators.',
+  },
+]
 
 export function Features() {
   return (
     <section id="features" aria-labelledby="features-heading" className="border-t border-line bg-[#fbfbfe] py-20 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="mx-auto max-w-4xl text-center">
-          <h2 id="features-heading" className="text-3xl leading-tight font-extrabold tracking-[-0.03em] text-ink sm:text-[2.5rem]">
-            Simply designed to create{' '}
-            <span className="relative inline-block font-bold text-brand-500">
-              perfect results
-              <HandUnderline className="absolute inset-x-0 -bottom-1.5 h-2.5 w-full text-brand-200" />
-            </span>{' '}
-            <br className="hidden sm:block" />
-            fast.
-          </h2>
-          <p className="mt-5 text-sm text-ink-muted sm:text-base">Elementary tools, advanced features and an infinite canvas.</p>
-        </div>
+        <SectionHeading
+          id="features-heading"
+          lead="Simply designed to create"
+          accent="perfect results"
+          tail="fast."
+          description="Elementary tools, advanced features and an infinite canvas."
+        />
 
         <div className="mt-12 sm:mt-14">
           <ShowcasePreview />
         </div>
 
         <div className="mt-8 sm:mt-10">
-          <FeatureCards />
+          <FeatureCards features={features} />
         </div>
       </div>
     </section>
