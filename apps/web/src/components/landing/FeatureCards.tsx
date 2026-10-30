@@ -11,6 +11,7 @@ export type Feature = {
 const iconTones: Record<AccentTone, string> = {
   brand: 'bg-brand-100 text-brand-600',
   teal: 'bg-accent-teal-soft text-accent-teal',
+  orange: 'bg-accent-amber-soft text-accent-amber',
 }
 
 type FeatureCardsProps = {

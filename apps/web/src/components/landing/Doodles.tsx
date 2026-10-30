@@ -16,13 +16,13 @@ export function ScribbleFrame(props: SVGProps<SVGSVGElement>) {
 }
 
 /** Loose hand-drawn underline. Stretches to the width of its parent. */
-export function HandUnderline(props: SVGProps<SVGSVGElement>) {
+export function HandUnderline({ weight = 3, ...props }: SVGProps<SVGSVGElement> & { weight?: number }) {
   return (
     <svg viewBox="0 0 200 12" preserveAspectRatio="none" fill="none" aria-hidden="true" {...props}>
       <path
         d="M3 7 C 40 3, 80 10, 120 6 S 180 4, 197 7"
         stroke="currentColor"
-        strokeWidth={3}
+        strokeWidth={weight}
         strokeLinecap="round"
         vectorEffect="non-scaling-stroke"
       />
