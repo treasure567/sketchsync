@@ -1,22 +1,41 @@
-import clsx from 'clsx'
-import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type MouseEvent, type PointerEvent, type SetStateAction } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type Dispatch, type MouseEvent, type PointerEvent, type SetStateAction } from 'react'
 import { creationTools } from '@/components/board/tools'
 import type { BoardHistory } from '@/hooks/useBoardHistory'
-import { createFreedraw, createLinear, createShape, createSticky, finalizeCreated, resizeFromOrigin } from '@/lib/board/elements'
-import { boundsContain, boundsFromPoints, clampZoom, getBounds, hitTest, hitTopmost, screenToWorld, translate, zoomAt } from '@/lib/board/geometry'
-import { renderScene } from '@/lib/board/render'
-import type { BoardElement, Bounds, Camera, Point, Tool } from '@/lib/board/types'
+import { createFreedraw, createLinear, createShape, createSticky, createText, finalizeCreated, resizeFromOrigin } from '@/lib/board/elements'
+import {
+  boundsContain,
+  boundsFromPoints,
+  clampZoom,
+  getBounds,
+  handleCursors,
+  handlePositions,
+  hitTest,
+  hitTopmost,
+  resizeBounds,
+  scaleElement,
+  screenToWorld,
+  translate,
+  unionBounds,
+  zoomAt,
+  type HandleId,
+} from '@/lib/board/geometry'
+import { LIBRARY_DRAG_TYPE } from '@/lib/board/library'
+import { HANDLE_SIZE, renderScene, SELECTION_PADDING } from '@/lib/board/render'
+import type { BoardElement, Bounds, Camera, ElementStyle, Point, Tool } from '@/lib/board/types'
 
 /** How close (in screen pixels) a pointer must be to an element to hit it. */
 const HIT_TOLERANCE = 6
+/** Ignore touches for this long after a pen was used, so a resting palm doesn't draw. */
+const PALM_REJECTION_MS = 1500
 
 type Interaction =
   | { kind: 'pan'; startScreen: Point; startCamera: Camera }
   | { kind: 'pinch'; startDistance: number; startMid: Point; startCamera: Camera }
   | { kind: 'move'; ids: ReadonlySet<string>; last: Point }
+  | { kind: 'resize'; handle: HandleId; startBounds: Bounds; originals: Map<string, BoardElement> }
   | { kind: 'marquee'; origin: Point; base: ReadonlySet<string> }
   | { kind: 'create'; id: string; origin: Point }
-  | { kind: 'draw'; id: string; last: Point }
+  | { kind: 'draw'; id: string; last: Point; lastScreen: Point; pressure: number }
   | { kind: 'erase' }
 
 type BoardCanvasProps = {
@@ -25,13 +44,18 @@ type BoardCanvasProps = {
   onCameraChange: Dispatch<SetStateAction<Camera>>
   tool: Tool
   onToolChange: (tool: Tool) => void
+  /** Style given to newly drawn elements. */
+  currentStyle: ElementStyle
   locked: boolean
   /** Space is held, so dragging pans. */
   spaceHeld: boolean
   selectedIds: ReadonlySet<string>
   onSelectionChange: (ids: ReadonlySet<string>) => void
   editingId: string | null
-  onEditSticky: (id: string) => void
+  /** Open the text editor for a sticky note or text element. */
+  onEditText: (id: string) => void
+  onContextMenu: (screen: Point, world: Point) => void
+  onLibraryDrop: (itemId: string, world: Point) => void
   history: Pick<BoardHistory, 'begin' | 'update' | 'commit' | 'cancel' | 'apply'>
 }
 
@@ -45,21 +69,29 @@ export function BoardCanvas({
   onCameraChange,
   tool,
   onToolChange,
+  currentStyle,
   locked,
   spaceHeld,
   selectedIds,
   onSelectionChange,
   editingId,
-  onEditSticky,
+  onEditText,
+  onContextMenu,
+  onLibraryDrop,
   history,
 }: BoardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const interaction = useRef<Interaction | null>(null)
   const pointers = useRef(new Map<number, Point>())
+  const lastPenAt = useRef(0)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [marquee, setMarquee] = useState<Bounds | null>(null)
   const [panning, setPanning] = useState(false)
+  const [hoverCursor, setHoverCursor] = useState<string | null>(null)
   const [fontsReady, setFontsReady] = useState(false)
+
+  const selected = elements.filter((element) => selectedIds.has(element.id))
+  const canTransform = tool === 'select' && selected.length > 0 && selected.every((element) => !element.locked)
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current
@@ -69,7 +101,7 @@ export function BoardCanvas({
     return () => observer.disconnect()
   }, [])
 
-  // Sticky notes use a web font; draw again once it has loaded.
+  // Text uses web fonts; draw again once they have loaded.
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true))
   }, [])
@@ -83,8 +115,8 @@ export function BoardCanvas({
     const height = Math.round(size.height * pixelRatio)
     if (canvas.width !== width) canvas.width = width
     if (canvas.height !== height) canvas.height = height
-    renderScene(ctx, { elements, camera, width: size.width, height: size.height, pixelRatio, selectedIds, editingId, marquee })
-  }, [elements, camera, size, selectedIds, editingId, marquee, fontsReady])
+    renderScene(ctx, { elements, camera, width: size.width, height: size.height, pixelRatio, selectedIds, editingId, marquee, showHandles: canTransform && !marquee })
+  }, [elements, camera, size, selectedIds, editingId, marquee, canTransform, fontsReady])
 
   // Wheel pans; Ctrl/⌘ + wheel (and trackpad pinch) zooms. Registered natively so the page itself never zooms.
   useEffect(() => {
@@ -106,15 +138,24 @@ export function BoardCanvas({
     return () => canvas.removeEventListener('wheel', onWheel)
   }, [onCameraChange])
 
-  const toScreen = (event: PointerEvent) => {
+  const toScreen = (event: { clientX: number; clientY: number }) => {
     const rect = canvasRef.current!.getBoundingClientRect()
     return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  }
+
+  const hitHandle = (world: Point): HandleId | null => {
+    if (!canTransform) return null
+    const bounds = unionBounds(selected)
+    if (!bounds) return null
+    const reach = HANDLE_SIZE / camera.zoom
+    const handle = handlePositions(bounds, SELECTION_PADDING / camera.zoom).find((h) => Math.abs(h.x - world.x) <= reach && Math.abs(h.y - world.y) <= reach)
+    return handle?.id ?? null
   }
 
   const eraseAt = (point: Point) => {
     const tolerance = HIT_TOLERANCE / camera.zoom
     history.update((current) => {
-      const remaining = current.filter((element) => !hitTest(element, point, tolerance))
+      const remaining = current.filter((element) => element.locked || !hitTest(element, point, tolerance))
       return remaining.length === current.length ? current : remaining
     })
   }
@@ -122,13 +163,27 @@ export function BoardCanvas({
   const startPinch = () => {
     const current = interaction.current
     // A second finger means zoom, not draw: drop whatever the first finger started.
-    if (current && (current.kind === 'create' || current.kind === 'draw' || current.kind === 'move' || current.kind === 'erase')) history.cancel()
+    if (current && ['create', 'draw', 'move', 'resize', 'erase'].includes(current.kind)) history.cancel()
     setMarquee(null)
     const [a, b] = [...pointers.current.values()]
     interaction.current = { kind: 'pinch', startDistance: distance(a, b) || 1, startMid: midpoint(a, b), startCamera: camera }
   }
 
+  const finishCreation = () => {
+    if (!locked && creationTools.has(tool)) onToolChange('select')
+  }
+
+  const addTextAt = (world: Point) => {
+    const element = createText(world, currentStyle)
+    history.apply((current) => [...current, element])
+    onSelectionChange(new Set([element.id]))
+    onEditText(element.id)
+  }
+
   const handlePointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
+    if (event.pointerType === 'pen') lastPenAt.current = Date.now()
+    if (event.pointerType === 'touch' && Date.now() - lastPenAt.current < PALM_REJECTION_MS) return
+
     event.currentTarget.setPointerCapture(event.pointerId)
     const screen = toScreen(event)
     pointers.current.set(event.pointerId, screen)
@@ -147,6 +202,12 @@ export function BoardCanvas({
 
     switch (tool) {
       case 'select': {
+        const handle = hitHandle(world)
+        if (handle) {
+          history.begin()
+          interaction.current = { kind: 'resize', handle, startBounds: unionBounds(selected)!, originals: new Map(selected.map((element) => [element.id, element])) }
+          return
+        }
         const hit = hitTopmost(elements, world, HIT_TOLERANCE / camera.zoom)
         if (!hit) {
           if (!event.shiftKey) onSelectionChange(new Set())
@@ -163,9 +224,10 @@ export function BoardCanvas({
           selection = new Set([hit.id])
         }
         onSelectionChange(selection)
-        if (selection.has(hit.id)) {
+        const movable = new Set(elements.filter((element) => selection.has(element.id) && !element.locked).map((element) => element.id))
+        if (movable.has(hit.id)) {
           history.begin()
-          interaction.current = { kind: 'move', ids: selection, last: world }
+          interaction.current = { kind: 'move', ids: movable, last: world }
         }
         return
       }
@@ -174,7 +236,7 @@ export function BoardCanvas({
       case 'ellipse':
       case 'line':
       case 'arrow': {
-        const element = tool === 'line' || tool === 'arrow' ? createLinear(tool, world) : createShape(tool, world)
+        const element = tool === 'line' || tool === 'arrow' ? createLinear(tool, world, currentStyle) : createShape(tool, world, currentStyle)
         onSelectionChange(new Set())
         history.begin()
         history.update((current) => [...current, element])
@@ -182,21 +244,26 @@ export function BoardCanvas({
         return
       }
       case 'pencil': {
-        const element = createFreedraw(world)
+        const pressure = event.pointerType === 'pen' ? event.pressure : 0.5
+        const element = createFreedraw({ ...world, p: pressure }, currentStyle)
         onSelectionChange(new Set())
         history.begin()
         history.update((current) => [...current, element])
-        interaction.current = { kind: 'draw', id: element.id, last: world }
+        interaction.current = { kind: 'draw', id: element.id, last: world, lastScreen: screen, pressure }
         return
       }
       case 'sticky': {
-        const element = createSticky(world)
+        const element = createSticky(world, currentStyle)
         history.apply((current) => [...current, element])
         onSelectionChange(new Set([element.id]))
-        onEditSticky(element.id)
-        if (!locked) onToolChange('select')
+        onEditText(element.id)
+        finishCreation()
         return
       }
+      case 'text':
+        addTextAt(world)
+        finishCreation()
+        return
       case 'eraser':
         history.begin()
         interaction.current = { kind: 'erase' }
@@ -205,9 +272,18 @@ export function BoardCanvas({
     }
   }
 
+  const updateHoverCursor = (screen: Point) => {
+    const handle = tool === 'select' ? hitHandle(screenToWorld(screen, camera)) : null
+    const next = handle ? handleCursors[handle] : null
+    if (next !== hoverCursor) setHoverCursor(next)
+  }
+
   const handlePointerMove = (event: PointerEvent<HTMLCanvasElement>) => {
-    if (!pointers.current.has(event.pointerId)) return
     const screen = toScreen(event)
+    if (!pointers.current.has(event.pointerId)) {
+      updateHoverCursor(screen)
+      return
+    }
     pointers.current.set(event.pointerId, screen)
     const current = interaction.current
     if (!current) return
@@ -237,6 +313,14 @@ export function BoardCanvas({
         history.update((all) => all.map((element) => (current.ids.has(element.id) ? translate(element, dx, dy) : element)))
         return
       }
+      case 'resize': {
+        const next = resizeBounds(current.startBounds, current.handle, world, event.shiftKey)
+        history.update((all) => all.map((element) => {
+          const original = current.originals.get(element.id)
+          return original ? scaleElement(original, current.startBounds, next) : element
+        }))
+        return
+      }
       case 'create':
         history.update((all) =>
           all.map((element) => {
@@ -252,8 +336,13 @@ export function BoardCanvas({
       case 'draw': {
         // Skip points closer than a pixel apart to keep strokes light.
         if (distance(world, current.last) < 1 / camera.zoom) return
+        // Pens report real pressure; for mouse and touch, faster movement draws thinner.
+        const target = event.pointerType === 'pen' ? event.pressure : Math.min(1, Math.max(0.3, 1.15 - distance(screen, current.lastScreen) / 30))
+        const pressure = current.pressure * 0.6 + target * 0.4
         current.last = world
-        history.update((all) => all.map((element) => (element.id === current.id && element.type === 'freedraw' ? { ...element, points: [...element.points, world] } : element)))
+        current.lastScreen = screen
+        current.pressure = pressure
+        history.update((all) => all.map((element) => (element.id === current.id && element.type === 'freedraw' ? { ...element, points: [...element.points, { ...world, p: pressure }] } : element)))
         return
       }
       case 'erase':
@@ -262,7 +351,7 @@ export function BoardCanvas({
       case 'marquee': {
         const box = boundsFromPoints(current.origin, world)
         setMarquee(box)
-        const inside = elements.filter((element) => boundsContain(box, getBounds(element))).map((element) => element.id)
+        const inside = elements.filter((element) => !element.locked && boundsContain(box, getBounds(element))).map((element) => element.id)
         onSelectionChange(new Set([...current.base, ...inside]))
         return
       }
@@ -270,7 +359,7 @@ export function BoardCanvas({
   }
 
   const handlePointerUp = (event: PointerEvent<HTMLCanvasElement>) => {
-    pointers.current.delete(event.pointerId)
+    if (!pointers.current.delete(event.pointerId)) return
     const current = interaction.current
     if (!current) return
 
@@ -289,10 +378,11 @@ export function BoardCanvas({
         history.update((all) => all.map((element) => (element.id === current.id ? finalizeCreated(element) : element)))
         history.commit()
         onSelectionChange(new Set([current.id]))
-        if (!locked && creationTools.has(tool)) onToolChange('select')
+        finishCreation()
         return
       case 'draw':
       case 'move':
+      case 'resize':
       case 'erase':
         history.commit()
         return
@@ -304,24 +394,62 @@ export function BoardCanvas({
 
   const handleDoubleClick = (event: MouseEvent<HTMLCanvasElement>) => {
     if (tool !== 'select') return
-    const rect = event.currentTarget.getBoundingClientRect()
-    const world = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, camera)
+    const world = screenToWorld(toScreen(event), camera)
     const hit = hitTopmost(elements, world, HIT_TOLERANCE / camera.zoom)
-    if (hit?.type === 'sticky') onEditSticky(hit.id)
+    if (hit?.type === 'sticky' || hit?.type === 'text') {
+      if (!hit.locked) onEditText(hit.id)
+    } else if (!hit) {
+      addTextAt(world)
+    }
   }
 
-  const cursor = panning ? 'cursor-grabbing' : tool === 'hand' || spaceHeld ? 'cursor-grab' : tool === 'select' ? 'cursor-default' : 'cursor-crosshair'
+  const handleContextMenu = (event: MouseEvent<HTMLCanvasElement>) => {
+    event.preventDefault()
+    const screen = toScreen(event)
+    const world = screenToWorld(screen, camera)
+    const hit = hitTopmost(elements, world, HIT_TOLERANCE / camera.zoom)
+    if (hit && !selectedIds.has(hit.id)) onSelectionChange(new Set([hit.id]))
+    if (!hit) onSelectionChange(new Set())
+    onContextMenu({ x: event.clientX, y: event.clientY }, world)
+  }
+
+  const handleDragOver = (event: DragEvent<HTMLCanvasElement>) => {
+    if (!event.dataTransfer.types.includes(LIBRARY_DRAG_TYPE)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+
+  const handleDrop = (event: DragEvent<HTMLCanvasElement>) => {
+    const itemId = event.dataTransfer.getData(LIBRARY_DRAG_TYPE)
+    if (!itemId) return
+    event.preventDefault()
+    onLibraryDrop(itemId, screenToWorld(toScreen(event), camera))
+  }
+
+  const cursor = panning
+    ? 'grabbing'
+    : tool === 'hand' || spaceHeld
+      ? 'grab'
+      : tool === 'select'
+        ? (hoverCursor ?? 'default')
+        : tool === 'text'
+          ? 'text'
+          : 'crosshair'
 
   return (
     <canvas
       ref={canvasRef}
       aria-label="Whiteboard canvas"
-      className={clsx('absolute inset-0 size-full touch-none', cursor)}
+      className="absolute inset-0 size-full touch-none"
+      style={{ cursor }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     />
   )
 }
