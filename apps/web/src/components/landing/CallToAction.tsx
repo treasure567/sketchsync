@@ -28,11 +28,11 @@ export function CallToAction() {
             <span aria-hidden="true" className="-rotate-6 font-hand text-lg font-semibold text-brand-700 max-md:hidden">
               No credit card! →
             </span>
-            <ButtonLink to="/board" size="lg" className="w-full sm:w-auto sm:min-w-44">
+            <ButtonLink to="/board/new" size="lg" className="w-full sm:w-auto sm:min-w-44">
               <LogoMark className="size-5" />
               Start drawing
             </ButtonLink>
-            <ButtonLink to="/demo" variant="secondary" size="lg" className="w-full sm:w-auto sm:min-w-40">
+            <ButtonLink to="/board/new?template=flowchart" variant="secondary" size="lg" className="w-full sm:w-auto sm:min-w-40">
               <CirclePlay className="size-5" />
               Try a demo
             </ButtonLink>

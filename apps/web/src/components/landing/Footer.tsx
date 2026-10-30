@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { Logo } from '@/components/brand/Logo'
 
 const columns = [
@@ -18,6 +19,16 @@ const columns = [
     links: ['Privacy Policy', 'Terms of Service', 'Security Overview', 'Cookie Settings'],
   },
 ]
+
+/** Where footer links go; anything without an entry is a page that does not exist yet. */
+const destinations: Record<string, string> = {
+  Whiteboard: '/board/new',
+  'Infinite Canvas': '#features',
+  Wireframing: '#quick-sketch',
+  'Real-time Sync': '#collaboration',
+  'Community Templates': '/dashboard',
+  'Community Boards': '/dashboard',
+}
 
 const currentYear = new Date().getFullYear()
 
@@ -40,9 +51,15 @@ export function Footer() {
                 <ul className="mt-4 space-y-2.5">
                   {links.map((link) => (
                     <li key={link}>
-                      <a href="#" className="text-sm text-ink-muted transition-colors hover:text-brand-600">
-                        {link}
-                      </a>
+                      {destinations[link]?.startsWith('/') ? (
+                        <Link to={destinations[link]} className="text-sm text-ink-muted transition-colors hover:text-brand-600">
+                          {link}
+                        </Link>
+                      ) : (
+                        <a href={destinations[link] ?? '#'} className="text-sm text-ink-muted transition-colors hover:text-brand-600">
+                          {link}
+                        </a>
+                      )}
                     </li>
                   ))}
                 </ul>

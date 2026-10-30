@@ -35,7 +35,7 @@ export function Hero() {
         </div>
 
         <div className="mt-2 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:gap-4">
-          <ButtonLink to="/board" size="lg" className="sm:min-w-52">
+          <ButtonLink to="/board/new" size="lg" className="sm:min-w-52">
             <LogoMark className="size-5" />
             Start sketch for free
           </ButtonLink>
