@@ -30,7 +30,7 @@ export function Offline() {
           lead="Works offline,"
           accent="merges when you're back"
           tail="."
-          breakBeforeTail={false}
+          lineBreak="none"
           description="Keep drawing on a poor connection. Your edits merge automatically without conflict."
           tone="orange"
         />

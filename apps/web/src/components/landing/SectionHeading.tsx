@@ -14,21 +14,32 @@ type SectionHeadingProps = {
   lead: string
   accent: string
   /** Text after the accent. */
-  tail: string
-  /** Start the tail on a new line from the sm breakpoint. */
-  breakBeforeTail?: boolean
+  tail?: string
+  /** Where the heading breaks onto a second line from the sm breakpoint. */
+  lineBreak?: 'beforeAccent' | 'beforeTail' | 'none'
   description: string
   tone?: AccentTone
 }
 
+/** Line break that only applies from the sm breakpoint, so phones wrap naturally. */
+function SmBreak() {
+  return (
+    <>
+      {' '}
+      <br className="hidden sm:block" />
+    </>
+  )
+}
+
 /** Centred section title with a hand-underlined accent phrase. */
-export function SectionHeading({ id, lead, accent, tail, breakBeforeTail = true, description, tone = 'brand' }: SectionHeadingProps) {
+export function SectionHeading({ id, lead, accent, tail, lineBreak = 'beforeTail', description, tone = 'brand' }: SectionHeadingProps) {
   const accentTone = accentTones[tone]
 
   return (
     <div className="mx-auto max-w-4xl text-center">
       <h2 id={id} className="text-3xl leading-tight font-extrabold tracking-[-0.03em] text-ink sm:text-[2.5rem]">
-        {lead}{' '}
+        {lead}
+        {lineBreak === 'beforeAccent' ? <SmBreak /> : ' '}
         <span className={clsx('relative inline-block font-bold', accentTone.text)}>
           <HandUnderline
             weight={accentTone.weight}
@@ -36,15 +47,8 @@ export function SectionHeading({ id, lead, accent, tail, breakBeforeTail = true,
           />
           <span className="relative">{accent}</span>
         </span>
-        {breakBeforeTail ? (
-          <>
-            {' '}
-            <br className="hidden sm:block" />
-            {tail}
-          </>
-        ) : (
-          tail
-        )}
+        {tail && lineBreak === 'beforeTail' && <SmBreak />}
+        {tail}
       </h2>
       <p className="mx-auto mt-5 max-w-xl text-sm text-ink-muted sm:text-base">{description}</p>
     </div>
