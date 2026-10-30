@@ -1,3 +1,4 @@
+import { ScaledStage } from '@/components/landing/ScaledStage'
 import { ElementStylePanel } from '@/components/landing/board-preview/ElementStylePanel'
 import { LiveCursor } from '@/components/landing/board-preview/LiveCursor'
 import { PreviewToolbar } from '@/components/landing/board-preview/PreviewToolbar'
@@ -5,16 +6,9 @@ import { StickyNote } from '@/components/landing/board-preview/StickyNote'
 import { ThreadPanel } from '@/components/landing/board-preview/ThreadPanel'
 import { WorkflowNodeCard } from '@/components/landing/board-preview/WorkflowNodeCard'
 import { ZoomControls } from '@/components/landing/board-preview/ZoomControls'
-import { useElementWidth } from '@/hooks/useElementWidth'
 
-/*
- * The preview is laid out on a fixed-size stage and scaled to fit, so every
- * element keeps its position relative to the others at any width. Narrow
- * screens get a compact stage instead of a tiny, unreadable wide one.
- */
 const WIDE_STAGE = { width: 1360, height: 680 }
 const COMPACT_STAGE = { width: 480, height: 560 }
-const COMPACT_BREAKPOINT = 900
 
 const CARD = { width: 284, height: 236 }
 
@@ -92,31 +86,14 @@ function CompactStage() {
 }
 
 export function BoardPreview() {
-  const [containerRef, width] = useElementWidth<HTMLDivElement>()
-  const compact = width > 0 && width < COMPACT_BREAKPOINT
-  const stage = compact ? COMPACT_STAGE : WIDE_STAGE
-  const scale = width > 0 ? Math.min(width / stage.width, 1) : 1
-
   return (
-    <div
-      ref={containerRef}
-      role="img"
-      aria-label="Preview of a SketchSync board: three collaborators editing a workflow card, a sticky note and a comment thread at the same time."
-      className="relative overflow-hidden rounded-[28px] border border-line bg-board bg-dot-grid shadow-[0_30px_60px_-30px_rgba(18,18,42,0.25)]"
-      style={{ height: stage.height * scale }}
+    <ScaledStage
+      wide={WIDE_STAGE}
+      compact={COMPACT_STAGE}
+      label="Preview of a SketchSync board: three collaborators editing a workflow card, a sticky note and a comment thread at the same time."
+      className="rounded-[28px] border border-line bg-board bg-dot-grid shadow-[0_30px_60px_-30px_rgba(18,18,42,0.25)]"
     >
-      <div
-        aria-hidden="true"
-        className="absolute top-0 left-1/2 origin-top"
-        style={{
-          width: stage.width,
-          height: stage.height,
-          transform: `translateX(-50%) scale(${scale})`,
-          visibility: width > 0 ? 'visible' : 'hidden',
-        }}
-      >
-        {compact ? <CompactStage /> : <WideStage />}
-      </div>
-    </div>
+      {(layout) => (layout === 'compact' ? <CompactStage /> : <WideStage />)}
+    </ScaledStage>
   )
 }
