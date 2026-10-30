@@ -59,3 +59,12 @@
   background-image: radial-gradient(circle, #d6d6e2 1px, transparent 1px);
   background-size: 22px 22px;
 }
+
+/* Scrollable without a visible scrollbar, e.g. the board toolbar on phones. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
