@@ -2,6 +2,7 @@ import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // Public site address used for absolute URLs in link-preview meta tags.
 // Override when deploying elsewhere, e.g. VITE_SITE_URL=https://example.com pnpm build
@@ -35,7 +36,25 @@ const securityHeaders: Plugin = {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), securityHeaders],
+  plugins: [
+    react(),
+    tailwindcss(),
+    securityHeaders,
+    // Offline app shell: a service worker precaches the built app so it opens
+    // and works without a connection. Production builds only.
+    VitePWA({
+      registerType: 'autoUpdate',
+      // External registerSW.js (not inline) so the CSP can keep script-src 'self'.
+      injectRegister: 'script',
+      // public/site.webmanifest is linked from index.html already.
+      manifest: false,
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest}'],
+        navigateFallback: '/index.html',
+        cleanupOutdatedCaches: true,
+      },
+    }),
+  ],
   build: {
     // Keep fonts as files so the CSP can stay at font-src 'self' (no data: URLs).
     assetsInlineLimit: (file) => (file.endsWith('.woff2') ? false : undefined),
