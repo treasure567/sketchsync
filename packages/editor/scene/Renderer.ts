@@ -1,0 +1,393 @@
+import {
+  ElementSpatialIndex,
+  getCommonFrameId,
+  getFrameChildrenInsertionIndex,
+  getContainerElement,
+  isElementInViewport,
+  isTextElement,
+} from "@sketchsync/element";
+
+import { arrayToMap, memoize, toBrandedType } from "@sketchsync/common";
+
+import type {
+  SketchSyncElement,
+  SketchSyncFrameLikeElement,
+  NonDeleted,
+  NonDeletedSketchSyncElement,
+} from "@sketchsync/element/types";
+
+import type { Scene } from "@sketchsync/element";
+
+import { cancelStaticSceneThrottle } from "../renderer/staticScene";
+
+import type { RenderableElementsMap } from "./types";
+
+import type { AppState, ElementRenderOffsets } from "../types";
+
+type GetRenderableElementsOpts = {
+  zoom: AppState["zoom"];
+  offsetLeft: AppState["offsetLeft"];
+  offsetTop: AppState["offsetTop"];
+  scrollX: AppState["scrollX"];
+  scrollY: AppState["scrollY"];
+  height: AppState["height"];
+  width: AppState["width"];
+  editingTextElement: AppState["editingTextElement"];
+  newElement: AppState["newElement"];
+  selectedElements: readonly NonDeletedSketchSyncElement[];
+  selectedElementsAreBeingDragged: AppState["selectedElementsAreBeingDragged"];
+  frameToHighlight: AppState["frameToHighlight"];
+};
+
+export class Renderer {
+  private scene: Scene;
+  private elementIndex = new ElementSpatialIndex();
+
+  constructor(scene: Scene) {
+    this.scene = scene;
+  }
+
+  /**
+   * Adjusts the document-visible set for render-override translations: an
+   * element leaves it when its offset moves it out of view and enters it when
+   * its offset brings it in; everything else keeps its document visibility.
+   * Only translated elements go through viewport geometry. The result is
+   * memoized on the offsets' identity so that opacity-only snapshots don't
+   * reach it at all.
+   */
+  public getVisibleElementsWithRenderOffsets(
+    visibleElements: readonly NonDeletedSketchSyncElement[],
+    elementsMap: RenderableElementsMap,
+    appState: AppState,
+    offsets: ElementRenderOffsets,
+  ) {
+    return this._getVisibleElementsWithRenderOffsets({
+      visibleElements,
+      elementsMap,
+      offsets,
+      zoom: appState.zoom,
+      scrollX: appState.scrollX,
+      scrollY: appState.scrollY,
+      offsetLeft: appState.offsetLeft,
+      offsetTop: appState.offsetTop,
+      width: appState.width,
+      height: appState.height,
+      selectedElements: this.scene.getSelectedElements(appState),
+      frameToHighlight: appState.selectedElementsAreBeingDragged
+        ? appState.frameToHighlight
+        : null,
+    });
+  }
+
+  private _getVisibleElementsWithRenderOffsets = memoize(
+    ({
+      visibleElements,
+      elementsMap,
+      offsets,
+      selectedElements,
+      frameToHighlight,
+      ...viewport
+    }: Pick<
+      GetRenderableElementsOpts,
+      | "zoom"
+      | "scrollX"
+      | "scrollY"
+      | "offsetLeft"
+      | "offsetTop"
+      | "width"
+      | "height"
+      | "selectedElements"
+      | "frameToHighlight"
+    > & {
+      visibleElements: readonly NonDeletedSketchSyncElement[];
+      elementsMap: RenderableElementsMap;
+      offsets: ElementRenderOffsets;
+    }) => {
+      // Shifting the viewport instead of the element also works for arrow
+      // labels, whose coordinates derive from their container.
+      const isVisible = (
+        element: NonDeletedSketchSyncElement,
+        offset: ElementRenderOffsets extends ReadonlyMap<string, infer T>
+          ? T
+          : never,
+      ) =>
+        isElementInViewport(
+          element,
+          viewport.width,
+          viewport.height,
+          {
+            ...viewport,
+            scrollX: viewport.scrollX + offset.x,
+            scrollY: viewport.scrollY + offset.y,
+          },
+          elementsMap,
+        );
+
+      const documentVisible = this.getVisibleSet(visibleElements);
+      const added = new Set<NonDeletedSketchSyncElement>();
+      const removed = new Set<NonDeletedSketchSyncElement>();
+      const update = (
+        element: NonDeletedSketchSyncElement,
+        visible: boolean,
+      ) => {
+        if (documentVisible.has(element) !== visible) {
+          (visible ? added : removed).add(element);
+        }
+      };
+      for (const [id, offset] of offsets) {
+        const element = elementsMap.get(id);
+        // A bound label's own offset is ignored, and it needs no entry of
+        // its own: the static renderer draws it with its container and skips
+        // its entry, so its document visibility can stay as it is.
+        if (
+          !element ||
+          (isTextElement(element) && getContainerElement(element, elementsMap))
+        ) {
+          continue;
+        }
+        update(element, isVisible(element, offset));
+      }
+
+      if (!added.size && !removed.size) {
+        return visibleElements;
+      }
+
+      const needsFrameReordering =
+        frameToHighlight &&
+        getCommonFrameId(selectedElements) !== frameToHighlight.id;
+      if (!added.size && !needsFrameReordering) {
+        return visibleElements.filter((element) => !removed.has(element));
+      }
+
+      // Rebuild in scene order when elements enter the view. Frame-drag
+      // ordering also needs rebuilding on removals, since the anchoring frame
+      // may have left the view.
+      const result: NonDeletedSketchSyncElement[] = [];
+      for (const element of elementsMap.values()) {
+        if (
+          added.has(element) ||
+          (documentVisible.has(element) && !removed.has(element))
+        ) {
+          result.push(element);
+        }
+      }
+      return needsFrameReordering
+        ? this.sortSelectedElementsIntoHighlightedFrame({
+            visibleElements: result,
+            selectedElements,
+            frameToHighlight,
+          })
+        : result;
+    },
+  );
+
+  /** the document-visible elements as a set, cached per visible array */
+  private visibleSets = new WeakMap<
+    readonly NonDeletedSketchSyncElement[],
+    Set<NonDeletedSketchSyncElement>
+  >();
+
+  private getVisibleSet(
+    visibleElements: readonly NonDeletedSketchSyncElement[],
+  ) {
+    let set = this.visibleSets.get(visibleElements);
+    if (!set) {
+      set = new Set(visibleElements);
+      this.visibleSets.set(visibleElements, set);
+    }
+    return set;
+  }
+
+  private getRenderableElementsMap({
+    elements,
+    editingTextElement,
+    newElement,
+  }: {
+    elements: readonly NonDeletedSketchSyncElement[];
+    editingTextElement: AppState["editingTextElement"];
+    newElement: AppState["newElement"];
+  }) {
+    const elementsMap = toBrandedType<RenderableElementsMap>(new Map());
+    const newElementCanvasElement = newElement?.frameId ? null : newElement;
+
+    for (const element of elements) {
+      if (newElementCanvasElement?.id === element.id) {
+        continue;
+      }
+
+      // we don't want to render text element that's being currently edited
+      // (it's rendered on remote only)
+      if (
+        !editingTextElement ||
+        editingTextElement.type !== "text" ||
+        element.id !== editingTextElement.id
+      ) {
+        elementsMap.set(element.id, element);
+      }
+    }
+    return { elementsMap, newElementCanvasElement };
+  }
+
+  private sortSelectedElementsIntoHighlightedFrame<
+    T extends SketchSyncElement,
+  >({
+    visibleElements,
+    selectedElements,
+    frameToHighlight,
+  }: {
+    selectedElements: readonly NonDeletedSketchSyncElement[];
+    visibleElements: readonly T[];
+    frameToHighlight: NonDeleted<SketchSyncFrameLikeElement>;
+  }): readonly T[] {
+    if (!selectedElements.length) {
+      return visibleElements;
+    }
+
+    // we assume all selected elements are eligible frame children if
+    // frameToHighlight is defined
+    const selectedElementsMap = arrayToMap(selectedElements);
+
+    // thus, all deselected elements are the ones we won't reorder
+    const deselectedElements = visibleElements.filter(
+      (element) => !selectedElementsMap.has(element.id),
+    );
+
+    const insertionIndex = getFrameChildrenInsertionIndex(
+      deselectedElements,
+      frameToHighlight.id,
+    );
+
+    if (insertionIndex === null) {
+      return visibleElements;
+    }
+
+    return [
+      ...deselectedElements.slice(0, insertionIndex),
+      ...selectedElements,
+      ...deselectedElements.slice(insertionIndex),
+    ] as readonly T[];
+  }
+
+  // Kept apart from the viewport so that panning reuses the map (and the
+  // spatial index synced to it) instead of rebuilding both every frame.
+  private _getRenderableElementsMap = memoize(
+    ({
+      editingTextElement,
+      newElement,
+    }: Pick<GetRenderableElementsOpts, "editingTextElement" | "newElement"> & {
+      canvasNonce: string;
+    }) =>
+      this.getRenderableElementsMap({
+        elements: this.scene.getNonDeletedElements(),
+        editingTextElement,
+        newElement,
+      }),
+  );
+
+  private _getRenderableElements = memoize(
+    ({
+      canvasNonce,
+      zoom,
+      offsetLeft,
+      offsetTop,
+      scrollX,
+      scrollY,
+      height,
+      width,
+      editingTextElement,
+      newElement,
+    }: Omit<
+      GetRenderableElementsOpts,
+      | "selectedElements"
+      | "selectedElementsAreBeingDragged"
+      | "frameToHighlight"
+    > & {
+      canvasNonce: string;
+    }) => {
+      const { elementsMap, newElementCanvasElement } =
+        this._getRenderableElementsMap({
+          canvasNonce,
+          editingTextElement,
+          newElement,
+        });
+
+      const visibleElements = this.elementIndex.getVisibleElements(
+        elementsMap,
+        { zoom, offsetLeft, offsetTop, scrollX, scrollY, height, width },
+      );
+
+      return {
+        elementsMap,
+        visibleElements,
+        newElementCanvasElement,
+        canvasNonce,
+      };
+    },
+  );
+
+  public getRenderableElements = (opts: GetRenderableElementsOpts) => {
+    const { newElement } = opts;
+    // A new element being drag-sized is mutated in place without informing
+    // the scene, so `sceneNonce` doesn't move. Fold the element's own nonce
+    // in where a canvas draws it from the live element but memoizes on this
+    // nonce: a framed new element stays in the static canvas' element map
+    // (see getRenderableElementsMap), and a new text gets its dashed text box
+    // drawn by the interactive canvas (it doubles as `editingTextElement`).
+    const canvasNonce = `${this.scene.getSceneNonce()}${
+      newElement?.frameId || isTextElement(newElement)
+        ? `:${newElement.versionNonce}`
+        : ""
+    }`;
+
+    const ret = this._getRenderableElements({
+      canvasNonce,
+
+      // don't spread `opts` because we don't want to memoize on some props
+
+      zoom: opts.zoom,
+      offsetLeft: opts.offsetLeft,
+      offsetTop: opts.offsetTop,
+      scrollX: opts.scrollX,
+      scrollY: opts.scrollY,
+      height: opts.height,
+      width: opts.width,
+      editingTextElement: opts.editingTextElement,
+      newElement: opts.newElement,
+    });
+
+    // if we're dragging elements over a frame, reorder the selected elements
+    // inside the frame during render (we don't set the `element.frameId` until
+    // pointerup else we'd have to painstainly restore the orig index if user
+    // didn't end up adding elements to the frame)
+    if (
+      opts.frameToHighlight &&
+      opts.selectedElementsAreBeingDragged &&
+      // if all dragged elements are already in the frame, don't reorder
+      getCommonFrameId(opts.selectedElements) !== opts.frameToHighlight.id
+    ) {
+      const reorderedVisibleElements =
+        this.sortSelectedElementsIntoHighlightedFrame({
+          visibleElements: ret.visibleElements,
+          selectedElements: opts.selectedElements,
+          frameToHighlight: opts.frameToHighlight,
+        });
+
+      return {
+        ...ret,
+        visibleElements: reorderedVisibleElements,
+      };
+    }
+
+    return ret;
+  };
+
+  // NOTE Doesn't destroy everything (scene, rc, etc.) because it may not be
+  // safe to break TS contract here (for upstream cases)
+  public destroy(staticCanvas: HTMLCanvasElement) {
+    cancelStaticSceneThrottle(staticCanvas);
+    this._getRenderableElements.clear();
+    this._getRenderableElementsMap.clear();
+    this._getVisibleElementsWithRenderOffsets.clear();
+    this.elementIndex.clear();
+  }
+}

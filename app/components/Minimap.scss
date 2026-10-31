@@ -1,0 +1,78 @@
+.sketchsync {
+  .sketchsync-minimap {
+    position: absolute;
+    inset-inline-end: var(--editor-container-padding);
+    // clears the help button SketchSync keeps in this corner
+    bottom: calc(
+      var(--editor-container-padding) + var(--lg-button-size) + 0.5rem
+    );
+    z-index: var(--zIndex-layerUI);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+    pointer-events: none;
+
+    & > * {
+      pointer-events: var(--ui-pointerEvents);
+    }
+
+    &--sidebar-open {
+      inset-inline-end: calc(
+        var(--right-sidebar-width) + var(--editor-container-padding)
+      );
+    }
+
+    &__canvas {
+      display: block;
+      box-sizing: border-box;
+      border-radius: var(--border-radius-lg);
+      background-color: var(--island-bg-color);
+      // the ring keeps the panel visible when the board and page share a colour
+      box-shadow: 0 0 0 1px var(--default-border-color), var(--shadow-island);
+      cursor: pointer;
+      touch-action: none;
+
+      &:focus {
+        outline: none;
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--focus-highlight-color);
+        outline-offset: 2px;
+      }
+    }
+
+    &__toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--default-button-size);
+      height: var(--default-button-size);
+      padding: 0;
+      border: none;
+      border-radius: var(--border-radius-lg);
+      background-color: var(--island-bg-color);
+      box-shadow: var(--shadow-island);
+      color: var(--icon-fill-color);
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--button-hover-bg);
+      }
+
+      &:active {
+        box-shadow: 0 0 0 1px var(--color-primary);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--focus-highlight-color);
+        outline-offset: 2px;
+      }
+
+      &[aria-pressed="true"] {
+        color: var(--color-primary);
+      }
+    }
+  }
+}

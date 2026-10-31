@@ -1,0 +1,51 @@
+.sketchsync {
+  .BrandLogo {
+    --logo-icon--mobile: 1rem;
+    --logo-text--mobile: 0.75rem;
+
+    --logo-icon--xs: 2rem;
+    --logo-text--xs: 1.5rem;
+
+    --logo-icon--small: 2.5rem;
+    --logo-text--small: 1.75rem;
+
+    --logo-icon--normal: 3rem;
+    --logo-text--normal: 2.2rem;
+
+    --logo-icon--large: 90px;
+    --logo-text--large: 65px;
+
+    display: flex;
+    align-items: center;
+
+    svg {
+      flex: 0 0 auto;
+    }
+
+    .BrandLogo-icon {
+      width: auto;
+    }
+
+    .BrandLogo-text {
+      margin-left: 0.75rem;
+      line-height: 1;
+      color: var(--color-logo-text);
+    }
+
+    @each $size in mobile, xs, small, normal, large {
+      &.is-#{$size} {
+        .BrandLogo-icon {
+          height: var(--logo-icon--#{$size});
+        }
+
+        .BrandLogo-text {
+          font-size: var(--logo-text--#{$size});
+        }
+      }
+    }
+
+    &.is-mobile .BrandLogo-text {
+      margin-left: 0.5rem;
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "allowSyntheticDefaultImports": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "emitDeclarationOnly": true,
+    "paths": {
+      "@sketchsync/common": ["./common/src/index.ts"],
+      "@sketchsync/common/*": ["./common/src/*"],
+      "@sketchsync/element": ["./element/src/index.ts"],
+      "@sketchsync/element/*": ["./element/src/*"],
+      "@sketchsync/editor": ["./editor/index.tsx"],
+      "@sketchsync/editor/*": ["./editor/*"],
+      "@sketchsync/laser-pointer": ["./laser-pointer/src/index.ts"],
+      "@sketchsync/laser-pointer/*": ["./laser-pointer/src/*"],
+      "@sketchsync/math": ["./math/src/index.ts"],
+      "@sketchsync/math/*": ["./math/src/*"],
+      "@sketchsync/utils": ["./utils/src/index.ts"],
+      "@sketchsync/utils/*": ["./utils/src/*"],
+      "@sketchsync/fractional-indexing": ["./fractional-indexing/src/index.ts"],
+      "@sketchsync/fractional-indexing/*": ["./fractional-indexing/src/*"]
+    }
+  }
+}

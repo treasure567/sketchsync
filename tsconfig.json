@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "rootDir": "./",
+    "target": "ESNext",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@sketchsync/common": ["./packages/common/src/index.ts"],
+      "@sketchsync/common/*": ["./packages/common/src/*"],
+      "@sketchsync/editor": ["./packages/editor/index.tsx"],
+      "@sketchsync/editor/*": ["./packages/editor/*"],
+      "@sketchsync/editor/common/*": ["./packages/common/src/*"],
+      "@sketchsync/editor/element/*": ["./packages/element/src/*"],
+      "@sketchsync/element": ["./packages/element/src/index.ts"],
+      "@sketchsync/element/*": ["./packages/element/src/*"],
+      "@sketchsync/fractional-indexing": ["./packages/fractional-indexing/src/index.ts"],
+      "@sketchsync/fractional-indexing/*": ["./packages/fractional-indexing/src/*"],
+      "@sketchsync/laser-pointer": ["./packages/laser-pointer/src/index.ts"],
+      "@sketchsync/laser-pointer/*": ["./packages/laser-pointer/src/*"],
+      "@sketchsync/math": ["./packages/math/src/index.ts"],
+      "@sketchsync/math/*": ["./packages/math/src/*"],
+      "@sketchsync/utils": ["./packages/utils/src/index.ts"],
+      "@sketchsync/utils/*": ["./packages/utils/src/*"]
+    }
+  },
+  "include": ["packages", "app"],
+  "exclude": ["dist", "types", "tests", "packages/mermaid-to-diagram/lib"]
+}

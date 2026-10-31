@@ -1,0 +1,7 @@
+@use "../css/theme" as *;
+
+.sketchsync {
+  .sketchsync-button {
+    @include outlineButtonStyles;
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@sketchsync/mermaid-to-diagram",
+  "version": "3.1.0",
+  "private": true,
+  "description": "Converts Mermaid diagrams to editor elements",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "license": "MIT",
+  "dependencies": {
+    "nanoid": "4.0.2",
+    "pele": "1.8.0"
+  }
+}

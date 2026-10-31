@@ -1,0 +1,16 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 77">
+  <!-- svg-source:sketchsync -->
+  <!-- payload-type:application/vnd.sketchsync+json --><!-- payload-version:2 --><!-- payload-start -->eyJ2ZXJzaW9uIjoiMSIsImVuY29kaW5nIjoiYnN0cmluZyIsImNvbXByZXNzZWQiOnRydWUsImVuY29kZWQiOiJ4nGVSy27bMFx1MDAxMLznK1x1MDAwNOZaNLJcdTAwMTT5dWuSJsilXHUwMDE3XHUwMDAzLYqgKFhqLVx1MDAxMmZIQlxcx5GDXHUwMDAw/Yze+ov5hHApV5RdXHUwMDFkXHUwMDA07OxrOLMvZ1nGsHPAllx1MDAxOfNcdTAwMWJAIX1nXHUwMDA0+0D4XHUwMDEztF5ZXHUwMDEzUkWMvd22XCJWSkS3vLjQVnAtrcdlmed531x1MDAwNFx1MDAxYVx1MDAxZcGgXHUwMDBmZVx1MDAwZiHOspf4XHUwMDBmXHUwMDE5VVPr6nouOn175/ZX+f1u3918h59fY2ss+sdcdTAwMDXhXHUwMDE5XHUwMDEz+lx1MDAxY6D5fDrEXYjLavaxXHUwMDFhkJ2qUVx1MDAxMpqKJKhGYsCq2YBx02ian1x1MDAwZojH1m7g2mrb0t5zsSh4wdPqX1xcbJrWbk091GDLjXe8XHLPTHVrpfVcbjvd68OF3LbATrZ8O5CcnOBDn7c6qDRkw9pGXHUwMDFh8P6oxzouXHUwMDE0klx1MDAwNJM8vYM4uvs66v7jdL7krTvMYZ6CXHUwMDExM1x1MDAwMPKlKPLZrJwu0pqR++Up+MWaeFxi1aIqq2lKK39cdTAwMTP8xzhxzbWHJCMp+Lm/jZ6l2WqdbCe7XHUwMDAzube/f36PNLVcdTAwMDZXalx1MDAwZse+XHUwMDEyestcdTAwMWaV7o5koVx1MDAxMZ+0aogx07BcdTAwMWV5XHUwMDEzWKNcbqc6pNG6scNcdTAwMWW0MrTlclx1MDAxMsHX8I9cdTAwMWEy7txcbjlSrr9j9qRgd/X/TZyv43eYXHUwMDFh3FD1gTm984xmvr5cdTAwMDNTdufcIn0=<!-- payload-end -->
+  <defs>
+    <style>
+      @font-face {
+        font-family: "Virgil";
+        src: url("https://example.com/Virgil.woff2");
+      }
+      @font-face {
+        font-family: "Cascadia";
+        src: url("https://example.com/Cascadia.woff2");
+      }
+    </style>
+  </defs>
+  <rect x="0" y="0" width="56" height="77" fill="#ffffff"></rect><g transform="translate(10 10) rotate(0 18 28.5)"><text x="0" y="41" font-family="Virgil, Segoe UI Emoji" font-size="36px" fill="#c92a2a" text-anchor="start" style="white-space: pre;" direction="ltr">😀</text></g></svg>
